@@ -1,0 +1,1129 @@
+<!doctype html>
+<html lang="es">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laboratorio de Termodinámica</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&amp;family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,750&amp;display=swap" rel="stylesheet">
+  <style>
+    /* Cuaderno de laboratorio: papel cuadriculado, tinta azul oscuro y colores con significado físico
+       (rojo = calor, azul = frío / gases, ocre = energía y máquinas). */
+    :root {
+      --ink:#1b2a3a; --ink-2:#2f4256; --muted:#566779; --paper:#f6f8fa; --grid:#e4eaf0; --grid-major:#d5dee7;
+      --line:#cdd7e1; --panel:#ffffff; --heat:#cf3e2e; --heat-soft:#fbe7e3; --cold:#2069a8; --cold-soft:#e6f0f9;
+      --energy:#a86d12; --energy-soft:#f7ecd9; --ok:#2f7d4f;
+      --display:"Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
+      --text:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+      /* Compatibilidad con estilos anteriores */
+      --blue:var(--cold); --orange:var(--heat);
+    }
+    * { box-sizing:border-box; }
+    body { font-family:var(--text); color:var(--ink); line-height:1.5;
+      background-color:var(--paper);
+      background-image:
+        linear-gradient(var(--grid-major) 1px, transparent 1px), linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+        linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size:120px 120px,120px 120px,24px 24px,24px 24px; background-position:-1px -1px; }
+    h1,h2,.display { font-family:var(--display); letter-spacing:-.015em; }
+    .station h2 { font-size:1.65rem; font-weight:750; line-height:1.12; margin-top:.35rem; }
+    header p { color:var(--muted); }
+    .canva-tag { font-size:.9rem; font-weight:700; color:var(--muted); }
+    .shell { width:100%; min-height:100vh; }
+    .station { display:none; } .station.active { display:block; animation:appear .25s ease-out both; }
+    @keyframes appear { from { opacity:0; } to { opacity:1; } }
+    .surface { background:var(--panel); border:1px solid var(--line); box-shadow:0 1px 0 #1b2a3a0d; }
+    .readout { font-variant-numeric:tabular-nums; }
+    .metric { background:#f3f6f9; border:1px solid #dfe6ee; border-radius:8px; padding:12px 14px; }
+    .metric > p:first-child { color:var(--muted); }
+    .metric-key { background:var(--cold-soft); border-color:#b9d1e8; }
+    .metric-key > p:first-child { color:var(--cold); font-weight:700; }
+    .chart-box { height:250px; position:relative; }
+    .flow { height:12px; border-radius:3px; transition:width .35s; }
+    .badge-fixed { font-size:.85rem; font-weight:700; color:var(--cold); background:var(--cold-soft); border:1px solid #c6daee; border-radius:6px; padding:.2rem .6rem; }
+    .equation { font-family:var(--text); font-weight:700; font-size:1.08rem; }
+    .equation sub { font-size:.7em; }
+
+    /* Controles */
+    .group-label { font-weight:700; display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; margin-bottom:.5rem; }
+    .group-label output { font-variant-numeric:tabular-nums; color:var(--cold); font-weight:700; text-align:right; }
+    .tool { display:flex; align-items:center; justify-content:center; gap:.45rem; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+            border-radius:8px; padding:.55rem .7rem; font-weight:700; font-size:.9rem; line-height:1.15; min-height:44px; text-align:center; cursor:pointer;
+            transition:background-color .15s, border-color .15s, color .15s; }
+    .tool:hover:not(:disabled) { border-color:var(--ink-2); background:#f2f5f8; }
+    .tool:active:not(:disabled) { background:#e7edf3; }
+    .tool:disabled { opacity:.4; cursor:not-allowed; }
+    .tool svg { width:18px; height:18px; flex:none; }
+    .tool[aria-pressed="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+    .tool.hot[aria-pressed="true"] { background:var(--heat); border-color:var(--heat); }
+    .tool.cold[aria-pressed="true"] { background:var(--cold); border-color:var(--cold); }
+    .lab-msg { font-size:.9rem; color:#a8331f; min-height:1.3rem; }
+    .lab-scene { width:100%; height:auto; display:block; border:1px solid var(--line); border-radius:8px;
+      background-color:#fbfcfd; background-image:linear-gradient(#edf1f5 1px, transparent 1px), linear-gradient(90deg, #edf1f5 1px, transparent 1px); background-size:20px 20px; }
+    .lab-scene text { font-family:var(--text); }
+
+    /* Portada */
+    .hero-title { font-family:var(--display); font-weight:750; line-height:.98; letter-spacing:-.035em; color:var(--ink); }
+    .hero-author { font-size:1.15rem; color:var(--muted); margin-top:1.1rem; }
+    .thermo { margin-top:1.6rem; max-width:56rem; }
+    .thermo svg { display:block; width:100%; height:auto; }
+    .thermo-fill { transform-box:fill-box; transform-origin:left center; animation:thermo-rise 1.8s cubic-bezier(.2,.7,.2,1) .25s both; }
+    @keyframes thermo-rise { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+    .thermo-labels { display:flex; justify-content:space-between; font-size:.8rem; color:var(--muted); padding:0 0 0 2.4%; font-variant-numeric:tabular-nums; }
+    .home-hint { font-weight:700; font-size:1.05rem; margin:3rem 0 1rem; }
+    .lab-card { --topic:var(--cold); --topic-soft:var(--cold-soft);
+      display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:.35rem; background:#fff;
+      border:1.5px solid var(--line); border-radius:10px; padding:1.15rem 1.25rem 1.25rem; cursor:pointer; color:var(--ink);
+      transition:border-color .15s, background-color .15s; }
+    .lab-card:hover { border-color:var(--topic); background:linear-gradient(var(--topic-soft),#fff 70%); }
+    .lab-card.topic-heat { --topic:var(--heat); --topic-soft:var(--heat-soft); }
+    .lab-card.topic-energy { --topic:var(--energy); --topic-soft:var(--energy-soft); }
+    .lab-card-head { display:flex; align-items:center; gap:.6rem; width:100%; }
+    .lab-card-num { font-family:var(--display); font-weight:750; font-size:1.05rem; width:2rem; height:2rem; border-radius:50%;
+      display:grid; place-items:center; color:#fff; background:var(--topic); flex:none; }
+    .lab-card-topic { font-size:.88rem; font-weight:700; color:var(--topic); }
+    .lab-card-title { font-family:var(--display); font-weight:750; font-size:1.3rem; line-height:1.15; margin-top:.4rem; }
+    .lab-card-formula { font-size:1.12rem; font-weight:700; color:var(--ink-2); background:#f3f6f9; border-radius:6px; padding:.15rem .5rem; margin:.15rem 0 .2rem; }
+    .lab-card-formula sub { font-size:.7em; }
+    .lab-card-desc { font-size:.95rem; color:var(--muted); line-height:1.45; }
+
+    /* Animaciones de las escenas */
+    .slide { transition:transform .45s ease; }
+    .flicker { transform-box:fill-box; transform-origin:50% 100%; animation:flick .16s ease-in-out infinite alternate; }
+    @keyframes flick { from { transform:scale(1,1); } to { transform:scale(.93,1.07); } }
+    .steam path { animation:steam 1.8s ease-in-out infinite; }
+    .steam path:nth-child(2) { animation-delay:.6s; } .steam path:nth-child(3) { animation-delay:1.2s; }
+    @keyframes steam { from { transform:translateY(4px); } to { transform:translateY(-8px); } }
+    .ice-cube { transform-box:fill-box; transform-origin:center; animation:melt 2.2s ease-in forwards; }
+    @keyframes melt { 0% { opacity:1; transform:scale(1); } 70% { opacity:.8; transform:scale(.55); } 100% { opacity:0; transform:scale(.1); } }
+    #hot-beaker { transition:transform .8s ease; transform-origin:220px 110px; }
+    #pour-stream { transition:opacity .25s; }
+    .spin { transform-box:fill-box; transform-origin:center; animation:spin 3s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    button:focus-visible, .lab-card:focus-visible { outline:3px solid #f0a83a; outline-offset:2px; }
+    @media (prefers-reduced-motion:reduce) { *,*:before,*:after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+  </style>
+  <style data-tailwind>*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com*/*,:after,:before{border:0 solid #e5e7eb;box-sizing:border-box}:after,:before{--tw-content:""}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-feature-settings:normal;font-variation-settings:normal;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-tap-highlight-color:transparent}body{line-height:inherit;margin:0}hr{border-top-width:1px;color:inherit;height:0}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-size:1em;font-variation-settings:normal}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{border-collapse:collapse;border-color:inherit;text-indent:0}button,input,optgroup,select,textarea{color:inherit;font-family:inherit;font-feature-settings:inherit;font-size:100%;font-variation-settings:inherit;font-weight:inherit;letter-spacing:inherit;line-height:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{color:#9ca3af;opacity:1}input::placeholder,textarea::placeholder{color:#9ca3af;opacity:1}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{height:auto;max-width:100%}[hidden]:where(:not([hidden=until-found])){display:none}.fixed{position:fixed}.col-span-2{grid-column:span 2/span 2}.mx-auto{margin-left:auto;margin-right:auto}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}.mb-4{margin-bottom:1rem}.mb-5{margin-bottom:1.25rem}.mb-6{margin-bottom:1.5rem}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}.mt-5{margin-top:1.25rem}.mt-6{margin-top:1.5rem}.block{display:block}.flex{display:flex}.table{display:table}.grid{display:grid}.hidden{display:none}.h-3{height:.75rem}.w-full{width:100%}.max-w-7xl{max-width:80rem}.max-w-xl{max-width:36rem}.transform{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.resize{resize:both}.grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-start{align-items:flex-start}.items-center{align-items:center}.items-stretch{align-items:stretch}.justify-between{justify-content:space-between}.justify-around{justify-content:space-around}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.gap-5{gap:1.25rem}.gap-6{gap:1.5rem}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-bottom:calc(1rem*var(--tw-space-y-reverse));margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)))}.space-y-5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-bottom:calc(1.25rem*var(--tw-space-y-reverse));margin-top:calc(1.25rem*(1 - var(--tw-space-y-reverse)))}.overflow-x-auto{overflow-x:auto}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:.5rem}.rounded-xl{border-radius:.75rem}.border{border-width:1px}.border-\[\#cdd7e1\]{--tw-border-opacity:1;border-color:rgb(205 215 225/var(--tw-border-opacity,1))}.bg-\[\#1b2a3a\]{--tw-bg-opacity:1;background-color:rgb(27 42 58/var(--tw-bg-opacity,1))}.bg-\[\#2069a8\]{--tw-bg-opacity:1;background-color:rgb(32 105 168/var(--tw-bg-opacity,1))}.bg-\[\#cf3e2e\]{--tw-bg-opacity:1;background-color:rgb(207 62 46/var(--tw-bg-opacity,1))}.bg-\[\#e9eef3\]{--tw-bg-opacity:1;background-color:rgb(233 238 243/var(--tw-bg-opacity,1))}.p-6{padding:1.5rem}.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-1{padding-bottom:.25rem;padding-top:.25rem}.py-3{padding-bottom:.75rem;padding-top:.75rem}.pb-12{padding-bottom:3rem}.pb-14{padding-bottom:3.5rem}.pb-5{padding-bottom:1.25rem}.pt-12{padding-top:3rem}.pt-6{padding-top:1.5rem}.pt-7{padding-top:1.75rem}.text-left{text-align:left}.text-center{text-align:center}.text-right{text-align:right}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-5xl{font-size:3rem;line-height:1}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-bold{font-weight:700}.font-semibold{font-weight:600}.leading-relaxed{line-height:1.625}.text-\[\#2069a8\]{--tw-text-opacity:1;color:rgb(32 105 168/var(--tw-text-opacity,1))}.text-\[\#566779\]{--tw-text-opacity:1;color:rgb(86 103 121/var(--tw-text-opacity,1))}.text-\[\#b8321f\]{--tw-text-opacity:1;color:rgb(184 50 31/var(--tw-text-opacity,1))}.text-\[\#cf3e2e\]{--tw-text-opacity:1;color:rgb(207 62 46/var(--tw-text-opacity,1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.ease-in{transition-timing-function:cubic-bezier(.4,0,1,1)}.ease-in-out{transition-timing-function:cubic-bezier(.4,0,.2,1)}.ease-out{transition-timing-function:cubic-bezier(0,0,.2,1)}.hover\:bg-\[\#2f4256\]:hover{--tw-bg-opacity:1;background-color:rgb(47 66 86/var(--tw-bg-opacity,1))}.hover\:bg-\[\#eef2f6\]:hover{--tw-bg-opacity:1;background-color:rgb(238 242 246/var(--tw-bg-opacity,1))}@media (min-width:640px){.sm\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.sm\:grid-cols-\[230px_1fr\]{grid-template-columns:230px 1fr}.sm\:text-6xl{font-size:3.75rem;line-height:1}}@media (min-width:768px){.md\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.md\:gap-4{gap:1rem}.md\:p-8{padding:2rem}.md\:px-10{padding-left:2.5rem;padding-right:2.5rem}.md\:pt-20{padding-top:5rem}.md\:pt-8{padding-top:2rem}}@media (min-width:1024px){.lg\:grid-cols-\[330px_1fr\]{grid-template-columns:330px 1fr}.lg\:text-7xl{font-size:4.5rem;line-height:1}}</style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.577.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+ </head>
+ <body data-template-id="__page-root" class="w-full">
+  <div class="shell w-full">
+   <header id="home" class="max-w-7xl mx-auto px-5 pt-12 pb-14 md:px-10 md:pt-20">
+    <h1 data-template-id="page-title" class="hero-title canva-text text-5xl sm:text-6xl lg:text-7xl">Laboratorio de Termodinámica</h1>
+    <div class="thermo" aria-hidden="true">
+     <svg viewBox="0 0 1000 60">
+      <defs><linearGradient id="thermo-grad" x1="0" x2="1"><stop offset="0" stop-color="#2069a8"/><stop offset=".55" stop-color="#8a5aa0"/><stop offset="1" stop-color="#cf3e2e"/></linearGradient></defs>
+      <rect x="40" y="14" width="950" height="22" rx="11" fill="#ffffff" stroke="#9fb0c0" stroke-width="2"/>
+      <rect class="thermo-fill" x="44" y="18" width="942" height="14" rx="7" fill="url(#thermo-grad)"/>
+      <circle cx="30" cy="25" r="22" fill="#2069a8" stroke="#9fb0c0" stroke-width="2"/>
+      <line x1="60.0" y1="44" x2="60.0" y2="56" stroke="#8597a8" stroke-width="2"/><line x1="106.5" y1="44" x2="106.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="153.0" y1="44" x2="153.0" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="199.5" y1="44" x2="199.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="246.0" y1="44" x2="246.0" y2="56" stroke="#8597a8" stroke-width="2"/><line x1="292.5" y1="44" x2="292.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="339.0" y1="44" x2="339.0" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="385.5" y1="44" x2="385.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="432.0" y1="44" x2="432.0" y2="56" stroke="#8597a8" stroke-width="2"/><line x1="478.5" y1="44" x2="478.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="525.0" y1="44" x2="525.0" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="571.5" y1="44" x2="571.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="618.0" y1="44" x2="618.0" y2="56" stroke="#8597a8" stroke-width="2"/><line x1="664.5" y1="44" x2="664.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="711.0" y1="44" x2="711.0" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="757.5" y1="44" x2="757.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="804.0" y1="44" x2="804.0" y2="56" stroke="#8597a8" stroke-width="2"/><line x1="850.5" y1="44" x2="850.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="897.0" y1="44" x2="897.0" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="943.5" y1="44" x2="943.5" y2="51" stroke="#8597a8" stroke-width="1.2"/><line x1="990.0" y1="44" x2="990.0" y2="56" stroke="#8597a8" stroke-width="2"/>
+     </svg>
+     <div class="thermo-labels"><span>0 °C</span><span>25 °C</span><span>50 °C</span><span>75 °C</span><span>100 °C</span></div>
+    </div>
+    <p data-template-id="page-author" class="hero-author canva-text">Creado por Israel H. Mena M.</p>
+    <p class="home-hint">Elige una actividad para comenzar</p>
+    <nav class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4" aria-label="Actividades del laboratorio">
+     <button type="button" class="lab-card topic-heat" data-open="heat" data-template-id="card-heat">
+      <span class="lab-card-head"><span class="lab-card-num">1</span><span class="lab-card-topic">Calor y temperatura</span></span>
+      <span class="lab-card-title">Calentamiento</span>
+      <span class="lab-card-formula">Q = m·c·ΔT</span>
+      <span class="lab-card-desc">¿Qué vaso se calienta más rápido con el mismo mechero?</span>
+     </button>
+     <button type="button" class="lab-card topic-heat" data-open="mix" data-template-id="card-mix">
+      <span class="lab-card-head"><span class="lab-card-num">2</span><span class="lab-card-topic">Calor y temperatura</span></span>
+      <span class="lab-card-title">Equilibrio térmico</span>
+      <span class="lab-card-formula">Q<sub>cedido</sub> + Q<sub>absorbido</sub> = 0</span>
+      <span class="lab-card-desc">Mezcla agua caliente con agua fría y cubos de hielo.</span>
+     </button>
+     <button type="button" class="lab-card topic-energy" data-open="gas" data-template-id="card-gas">
+      <span class="lab-card-head"><span class="lab-card-num">3</span><span class="lab-card-topic">Energía y máquinas</span></span>
+      <span class="lab-card-title">Gas y pistón</span>
+      <span class="lab-card-formula">ΔU = Q − W</span>
+      <span class="lab-card-desc">Primera ley: calor, trabajo y energía interna de un gas.</span>
+     </button>
+     <button type="button" class="lab-card topic-energy" data-open="carnot" data-template-id="card-carnot">
+      <span class="lab-card-head"><span class="lab-card-num">4</span><span class="lab-card-topic">Energía y máquinas</span></span>
+      <span class="lab-card-title">Máquina de Carnot</span>
+      <span class="lab-card-formula">η = 1 − T<sub>c</sub> / T<sub>h</sub></span>
+      <span class="lab-card-desc">Cuánto trabajo puede entregar, como máximo, una máquina térmica.</span>
+     </button>
+     <button type="button" class="lab-card" data-open="gl" data-template-id="card-gl">
+      <span class="lab-card-head"><span class="lab-card-num">5</span><span class="lab-card-topic">Leyes de los gases</span></span>
+      <span class="lab-card-title">Ley de Gay-Lussac</span>
+      <span class="lab-card-formula">p₁ / T₁ = p₂ / T₂</span>
+      <span class="lab-card-desc">Presión y temperatura en un recipiente rígido.</span>
+     </button>
+     <button type="button" class="lab-card" data-open="ch" data-template-id="card-ch">
+      <span class="lab-card-head"><span class="lab-card-num">6</span><span class="lab-card-topic">Leyes de los gases</span></span>
+      <span class="lab-card-title">Ley de Charles</span>
+      <span class="lab-card-formula">V₁ / T₁ = V₂ / T₂</span>
+      <span class="lab-card-desc">Volumen y temperatura con presión constante.</span>
+     </button>
+     <button type="button" class="lab-card" data-open="by" data-template-id="card-by">
+      <span class="lab-card-head"><span class="lab-card-num">7</span><span class="lab-card-topic">Leyes de los gases</span></span>
+      <span class="lab-card-title">Ley de Boyle</span>
+      <span class="lab-card-formula">p₁·V₁ = p₂·V₂</span>
+      <span class="lab-card-desc">Presión y volumen con temperatura constante.</span>
+     </button>
+     <button type="button" class="lab-card" data-open="av" data-template-id="card-av">
+      <span class="lab-card-head"><span class="lab-card-num">8</span><span class="lab-card-topic">Leyes de los gases</span></span>
+      <span class="lab-card-title">Ley de Avogadro</span>
+      <span class="lab-card-formula">V₁ / n₁ = V₂ / n₂</span>
+      <span class="lab-card-desc">Volumen y cantidad de gas.</span>
+     </button>
+     <button type="button" class="lab-card" data-open="cb" data-template-id="card-cb">
+      <span class="lab-card-head"><span class="lab-card-num">9</span><span class="lab-card-topic">Leyes de los gases</span></span>
+      <span class="lab-card-title">Ley general de los gases</span>
+      <span class="lab-card-formula">p₁V₁ / T₁ = p₂V₂ / T₂</span>
+      <span class="lab-card-desc">Presión, volumen y temperatura cambian a la vez.</span>
+     </button>
+    </nav>
+   </header>
+   <div id="activity-bar" class="max-w-7xl mx-auto px-5 pt-6 pb-5 md:px-10 md:pt-8" hidden>
+    <button type="button" id="back-btn" class="tool"><i data-lucide="arrow-left"></i>Volver a las actividades</button>
+   </div>
+   <main class="max-w-7xl mx-auto px-5 pb-12 md:px-10">
+
+    <!-- ============ 01 · CALENTAMIENTO ============ -->
+    <section id="heat" class="station" aria-labelledby="heat-title">
+     <div class="grid lg:grid-cols-[330px_1fr] gap-5">
+      <div class="surface canva-panel rounded-xl p-6" data-template-id="heat-controls">
+       <span data-template-id="heat-kicker" class="canva-tag">Actividad 1</span>
+       <h2 id="heat-title" data-template-id="heat-title" class="canva-text mt-3 mb-2">Dos masas, una potencia</h2>
+       <p data-template-id="heat-description" class="canva-text mb-6 leading-relaxed">Dos vasos sobre mecheros idénticos que comparten la misma llave de gas. Vierte o retira agua, regula la llama y acerca o aleja los mecheros. ¿Cuál se calienta más rápido?</p>
+       <div class="space-y-5">
+        <div>
+         <p class="group-label"><span>Llave de gas (ambos mecheros)</span><output id="flame-out">Media</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" id="flame-down"><i data-lucide="minus"></i>Bajar llama</button>
+          <button type="button" class="tool" id="flame-up"><i data-lucide="flame"></i>Subir llama</button>
+         </div>
+        </div>
+        <div>
+         <p class="group-label"><span>Distancia llama–rejilla</span><output id="dist-out">4 cm</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" id="burner-closer"><i data-lucide="chevrons-up"></i>Acercar</button>
+          <button type="button" class="tool" id="burner-farther"><i data-lucide="chevrons-down"></i>Alejar</button>
+         </div>
+        </div>
+        <div>
+         <p class="group-label"><span>Vaso A</span><output id="mass-a-out">250 mL</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" data-water="a" data-dm="0.05"><i data-lucide="droplet"></i>Verter 50 mL</button>
+          <button type="button" class="tool" data-water="a" data-dm="-0.05"><i data-lucide="minus"></i>Retirar 50 mL</button>
+         </div>
+        </div>
+        <div>
+         <p class="group-label"><span>Vaso B</span><output id="mass-b-out">500 mL</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" data-water="b" data-dm="0.05"><i data-lucide="droplet"></i>Verter 50 mL</button>
+          <button type="button" class="tool" data-water="b" data-dm="-0.05"><i data-lucide="minus"></i>Retirar 50 mL</button>
+         </div>
+        </div>
+        <div class="metric text-sm">Potencia que llega a cada vaso: <strong id="power-out" class="readout">153 W</strong></div>
+       </div>
+       <div class="flex gap-2 mt-6">
+        <button id="heat-play" type="button" class="rounded-lg px-5 py-3 font-bold text-white bg-[#1b2a3a] hover:bg-[#2f4256]">Encender mecheros</button>
+        <button id="heat-reset" type="button" data-template-id="heat-reset" class="canva-button rounded-lg px-5 py-3 font-bold border border-[#cdd7e1] hover:bg-[#eef2f6]">Reiniciar</button>
+       </div>
+       <p id="heat-msg" class="lab-msg mt-3" aria-live="polite"></p>
+       <p data-template-id="heat-note" class="canva-text mt-3 leading-relaxed text-sm text-[#566779]">Modelo ideal: agua inicial y agua agregada a 20 °C; sin pérdidas, sin calentar el vaso ni cambio de fase. Los mecheros se apagan a 95 °C.</p>
+      </div>
+      <div class="surface canva-panel rounded-xl p-6 md:p-8" data-template-id="heat-display">
+       <div class="flex flex-wrap justify-between gap-3 mb-4">
+        <div>
+         <p data-template-id="heat-observe" class="canva-text font-bold text-[#566779]">Tiempo transcurrido</p>
+         <p class="text-2xl font-bold readout mt-2">t = <span id="heat-time">0</span> s</p>
+        </div>
+        <div class="text-right">
+         <p data-template-id="heat-equation" class="canva-text equation">Q = m·c·ΔT&emsp;&emsp;C = m·c</p>
+         <p class="text-sm text-[#566779]">c agua = 4200 J/(kg·K)</p>
+        </div>
+       </div>
+       <div id="heat-scene" class="mb-4"></div>
+       <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="metric">
+         <p class="text-sm font-bold text-[#2069a8]">Vaso A</p>
+         <p class="text-2xl font-bold readout"><span id="temp-a">20,0</span> °C</p>
+         <p class="text-sm">Pendiente: <span id="slope-a">0,146</span> °C/s</p>
+        </div>
+        <div class="metric">
+         <p class="text-sm font-bold text-[#cf3e2e]">Vaso B</p>
+         <p class="text-2xl font-bold readout"><span id="temp-b">20,0</span> °C</p>
+         <p class="text-sm">Pendiente: <span id="slope-b">0,073</span> °C/s</p>
+        </div>
+       </div>
+       <div class="chart-box"><canvas id="heat-chart" role="img" aria-label="Gráfico de temperatura frente al tiempo para los dos vasos"></canvas></div>
+       <p class="text-sm text-[#566779] mt-4" id="heat-explain" aria-live="polite"></p>
+      </div>
+     </div>
+    </section>
+
+    <!-- ============ 02 · EQUILIBRIO ============ -->
+    <section id="mix" class="station" aria-labelledby="mix-title">
+     <div class="grid lg:grid-cols-[330px_1fr] gap-5">
+      <div class="surface canva-panel rounded-xl p-6" data-template-id="mix-controls">
+       <span data-template-id="mix-kicker" class="canva-tag">Actividad 2</span>
+       <h2 id="mix-title" data-template-id="mix-title" class="canva-text mt-3 mb-2">Cuando dos aguas se encuentran</h2>
+       <p data-template-id="mix-description" class="canva-text mb-6 leading-relaxed">Prepara agua caliente en la placa y agua fría con hielo. Luego vierte la caliente en el vaso frío y observa cómo fluye la energía hasta el equilibrio.</p>
+       <div class="space-y-5">
+        <div>
+         <p class="group-label"><span>Vaso caliente (sobre la placa)</span><output id="hot-out">200 mL a 60 °C</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" id="hot-add"><i data-lucide="droplet"></i>Verter 50 mL</button>
+          <button type="button" class="tool" id="hot-remove"><i data-lucide="minus"></i>Retirar 50 mL</button>
+          <button type="button" class="tool" id="plate-up"><i data-lucide="flame"></i>Placa +5 °C</button>
+          <button type="button" class="tool" id="plate-down"><i data-lucide="thermometer"></i>Placa −5 °C</button>
+         </div>
+        </div>
+        <div>
+         <p class="group-label"><span>Vaso frío</span><output id="cold-out">300 mL a 20 °C</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" id="cold-add"><i data-lucide="droplet"></i>Agua de grifo 50 mL</button>
+          <button type="button" class="tool" id="cold-remove"><i data-lucide="minus"></i>Retirar 50 mL</button>
+          <button type="button" class="tool col-span-2" id="ice-add"><i data-lucide="snowflake"></i>Agregar un cubo de hielo (10 g)</button>
+         </div>
+        </div>
+       </div>
+       <div class="flex gap-2 mt-6">
+        <button id="mix-play" type="button" class="rounded-lg px-5 py-3 font-bold text-white bg-[#1b2a3a] hover:bg-[#2f4256]">Verter y mezclar</button>
+        <button id="mix-reset" data-template-id="mix-reset" type="button" class="canva-button rounded-lg px-5 py-3 font-bold border border-[#cdd7e1] hover:bg-[#eef2f6]">Reiniciar</button>
+       </div>
+       <p id="mix-msg" class="lab-msg mt-3" aria-live="polite"></p>
+       <p data-template-id="mix-note" class="canva-text mt-3 leading-relaxed text-sm text-[#566779]">Vaso idealmente aislado y de capacidad calorífica despreciable. El agua de grifo está a 20 °C; el hielo, a 0 °C, se funde por completo (L = 334 kJ/kg) antes de mezclar. La velocidad dibujada es ilustrativa.</p>
+      </div>
+      <div class="surface canva-panel rounded-xl p-6 md:p-8" data-template-id="mix-display">
+       <p data-template-id="mix-equation" class="canva-text equation mb-4">Q<sub>cedido</sub> + Q<sub>absorbido</sub> = 0</p>
+       <div id="mix-scene" class="mb-3"></div>
+       <div class="flex flex-wrap justify-around gap-3 mb-4 text-center">
+        <p class="font-bold text-[#b8321f]">Porción caliente: <span id="mix-hot-now" class="readout">60,0</span> °C</p>
+        <p class="font-bold text-[#2069a8]">Porción fría: <span id="mix-cold-now" class="readout">20,0</span> °C</p>
+       </div>
+       <div class="metric text-center mb-4">
+        <p class="text-sm font-bold">Temperatura de equilibrio</p>
+        <p class="text-3xl font-bold readout"><span id="mix-final">36,0</span> °C</p>
+        <p class="text-sm mt-1">Energía transferida: <span id="mix-q">20 160</span> J, de la porción caliente a la fría.</p>
+       </div>
+       <div class="chart-box"><canvas id="mix-chart" role="img" aria-label="Gráfico de convergencia de temperaturas de las dos porciones"></canvas></div>
+      </div>
+     </div>
+    </section>
+
+    <!-- ============ 03 · GAS Y PISTÓN ============ -->
+    <section id="gas" class="station" aria-labelledby="gas-title">
+     <div class="grid lg:grid-cols-[330px_1fr] gap-5">
+      <div class="surface canva-panel rounded-xl p-6" data-template-id="gas-controls">
+       <span data-template-id="gas-kicker" class="canva-tag">Actividad 3</span>
+       <h2 id="gas-title" data-template-id="gas-title" class="canva-text mt-3 mb-2">El gas mueve el pistón</h2>
+       <p data-template-id="gas-description" class="canva-text mb-6 leading-relaxed">El sistema es el aire del cilindro. Pon o quita pesas, caliéntalo con el mechero, enfríalo en un baño de hielo o traba el pistón, y sigue los signos de la energía.</p>
+       <div class="space-y-5">
+        <div>
+         <p class="group-label"><span>Pesas sobre el pistón</span><output id="pressure-out">100 kPa</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" id="weight-add"><i data-lucide="plus"></i>Poner pesa</button>
+          <button type="button" class="tool" id="weight-remove"><i data-lucide="minus"></i>Quitar pesa</button>
+         </div>
+         <p class="text-xs text-[#566779] mt-2">Cada pesa suma 25 kPa a la presión externa (atmósfera + pistón = 100 kPa).</p>
+        </div>
+        <div>
+         <p class="group-label"><span>Intercambio de calor</span><output id="gas-q-out">0 J</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool hot" id="gas-burner" aria-pressed="false"><i data-lucide="flame"></i>Mechero</button>
+          <button type="button" class="tool cold" id="gas-ice" aria-pressed="false"><i data-lucide="snowflake"></i>Baño de hielo</button>
+         </div>
+        </div>
+        <div>
+         <p class="group-label"><span>Pistón</span><output id="lock-out">Libre</output></p>
+         <button type="button" class="tool w-full" id="gas-lock" aria-pressed="false"><i data-lucide="lock"></i>Trabar pistón</button>
+        </div>
+       </div>
+       <div class="flex gap-2 mt-6">
+        <button id="gas-reset" type="button" class="canva-button rounded-lg px-5 py-3 font-bold border border-[#cdd7e1] hover:bg-[#eef2f6]">Reiniciar</button>
+       </div>
+       <p id="gas-msg" class="lab-msg mt-3" aria-live="polite"></p>
+       <p data-template-id="gas-note" class="canva-text mt-3 leading-relaxed text-sm text-[#566779]">Aire ideal (diatómico) que parte de 2 L, 100 kPa y 300 K. Con el pistón libre, el mechero y el hielo actúan lentamente a presión externa constante. Al cambiar pesas o destrabar, el pistón se mueve de golpe contra la presión externa (proceso irreversible, línea punteada).</p>
+      </div>
+      <div class="surface canva-panel rounded-xl p-6 md:p-8" data-template-id="gas-display">
+       <p data-template-id="gas-equation" class="canva-text equation mb-5">W = p<sub>ext</sub>·ΔV&emsp;&emsp;ΔU = Q − W</p>
+       <div class="grid sm:grid-cols-[230px_1fr] gap-6 items-start">
+        <div class="flex flex-col items-center">
+         <div id="gas-scene" class="w-full"></div>
+         <p id="gas-direction" class="font-bold mt-3 text-center" aria-live="polite">Gas en equilibrio con la presión externa</p>
+        </div>
+        <div>
+         <div class="grid grid-cols-2 gap-3 mb-3">
+          <div class="metric"><p class="text-sm">ΔV</p><p class="text-xl font-bold readout" id="gas-dv">0,00 L</p></div>
+          <div class="metric"><p class="text-sm">Trabajo W</p><p class="text-xl font-bold readout" id="gas-work">0 J</p></div>
+          <div class="metric"><p class="text-sm">Calor Q</p><p class="text-xl font-bold readout" id="gas-heat">0 J</p></div>
+          <div class="metric"><p class="text-sm">Cambio ΔU</p><p class="text-xl font-bold readout" id="gas-du">0 J</p></div>
+         </div>
+         <p class="text-sm readout mb-3" id="gas-state">Gas: p = 100 kPa, V = 2,00 L, T = 300 K</p>
+         <div class="chart-box"><canvas id="gas-chart" role="img" aria-label="Gráfico presión frente a volumen del gas y presión externa"></canvas></div>
+        </div>
+       </div>
+       <p id="gas-explain" class="text-sm text-[#566779] mt-5" aria-live="polite"></p>
+      </div>
+     </div>
+    </section>
+
+    <!-- ============ 04 · CARNOT ============ -->
+    <section id="carnot" class="station" aria-labelledby="carnot-title">
+     <div class="grid lg:grid-cols-[330px_1fr] gap-5">
+      <div class="surface canva-panel rounded-xl p-6" data-template-id="carnot-controls">
+       <span data-template-id="carnot-kicker" class="canva-tag">Actividad 4</span>
+       <h2 id="carnot-title" data-template-id="carnot-title" class="canva-text mt-3 mb-2">El límite de una máquina</h2>
+       <p data-template-id="carnot-description" class="canva-text mb-6 leading-relaxed">Aviva o baja el mechero de la fuente caliente, cambia el baño de la fuente fría y descubre cuánta energía puede convertirse en trabajo, como máximo.</p>
+       <div class="space-y-5">
+        <div>
+         <p class="group-label"><span>Fuente caliente (mechero)</span><output id="th-out">600 K</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" id="th-up"><i data-lucide="flame"></i>Avivar (+50 K)</button>
+          <button type="button" class="tool" id="th-down"><i data-lucide="minus"></i>Bajar (−50 K)</button>
+         </div>
+        </div>
+        <div>
+         <p class="group-label"><span>Fuente fría (baño)</span><output id="tc-out">300 K</output></p>
+         <div class="grid grid-cols-2 gap-2" id="tc-presets">
+          <button type="button" class="tool cold" data-tc="195" aria-pressed="false"><i data-lucide="snowflake"></i>Hielo seco 195 K</button>
+          <button type="button" class="tool cold" data-tc="273" aria-pressed="false"><i data-lucide="snowflake"></i>Agua con hielo 273 K</button>
+          <button type="button" class="tool cold" data-tc="300" aria-pressed="true"><i data-lucide="droplet"></i>Agua ambiente 300 K</button>
+          <button type="button" class="tool cold" data-tc="330" aria-pressed="false"><i data-lucide="droplets"></i>Agua tibia 330 K</button>
+         </div>
+        </div>
+        <div>
+         <p class="group-label"><span>Calor por ciclo Qh</span><output id="qh-out">1000 J</output></p>
+         <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="tool" id="qh-up"><i data-lucide="plus"></i>Más contacto</button>
+          <button type="button" class="tool" id="qh-down"><i data-lucide="minus"></i>Menos contacto</button>
+         </div>
+         <p class="text-xs text-[#566779] mt-2">Más tiempo en contacto con la fuente caliente = más calor absorbido por ciclo (±100 J).</p>
+        </div>
+       </div>
+       <p id="carnot-constraint" class="lab-msg mt-3" aria-live="polite"></p>
+       <p data-template-id="carnot-note" class="canva-text mt-3 leading-relaxed text-sm text-[#566779]">Carnot es un límite reversible ideal. Una máquina real con fricción produce menos trabajo. Las temperaturas de la fórmula están en kelvin.</p>
+      </div>
+      <div class="surface canva-panel rounded-xl p-6 md:p-8" data-template-id="carnot-display">
+       <p data-template-id="carnot-equation" class="canva-text equation mb-4">η<sub>máx</sub> = 1 − T<sub>c</sub> / T<sub>h</sub>&emsp;&emsp;W = Q<sub>h</sub> − Q<sub>c</sub></p>
+       <div id="carnot-scene" class="mb-5"></div>
+       <div class="grid sm:grid-cols-3 gap-3 items-stretch mb-6 text-center">
+        <div class="metric"><p class="font-bold text-[#b8321f]">Fuente caliente</p><p class="text-2xl font-bold readout" id="carnot-hot">600 K</p></div>
+        <div class="metric"><p class="font-bold">Máquina ideal</p><p class="text-3xl font-bold text-[#2069a8] readout" id="carnot-eff">50,0 %</p><p class="text-xs">eficiencia máxima</p></div>
+        <div class="metric"><p class="font-bold text-[#2069a8]">Fuente fría</p><p class="text-2xl font-bold readout" id="carnot-cold">300 K</p></div>
+       </div>
+       <div class="space-y-4 max-w-xl mx-auto">
+        <div>
+         <div class="flex justify-between font-semibold"><span>Energía que entra, Q<sub>h</sub></span><span id="carnot-in">1000 J</span></div>
+         <div class="h-3 rounded-full bg-[#e9eef3] mt-2"><div class="flow bg-[#cf3e2e] w-full"></div></div>
+        </div>
+        <div>
+         <div class="flex justify-between font-semibold"><span>Trabajo útil máximo, W</span><span id="carnot-work">500 J</span></div>
+         <div class="h-3 rounded-full bg-[#e9eef3] mt-2"><div id="work-bar" class="flow bg-[#1b2a3a]"></div></div>
+        </div>
+        <div>
+         <div class="flex justify-between font-semibold"><span>Energía cedida al ambiente, Q<sub>c</sub></span><span id="carnot-out">500 J</span></div>
+         <div class="h-3 rounded-full bg-[#e9eef3] mt-2"><div id="cold-bar" class="flow bg-[#2069a8]"></div></div>
+        </div>
+       </div>
+       <div class="metric mt-6 text-center">
+        <p class="font-bold">Entropía de las fuentes por ciclo</p>
+        <p class="readout mt-1">ΔSh = <span id="entropy-hot">−1,67</span> J/K&emsp;&emsp;ΔSc = <span id="entropy-cold">+1,67</span> J/K</p>
+        <p class="readout">ΔStotal = <strong id="entropy-total">0,00</strong> J/K <span class="text-sm">(límite reversible)</span></p>
+       </div>
+      </div>
+     </div>
+    </section>
+
+    <footer class="pt-7 text-sm text-[#566779]">
+     <p data-template-id="footer-note" class="canva-text">Simulación conceptual. Los experimentos reales requieren mediciones, control de pérdidas y supervisión docente. Para prácticas con agua, utiliza solo agua tibia; no emplees fuego ni agua hirviendo sin supervisión.</p>
+    </footer>
+   </main>
+  </div>
+
+  <script>
+(() => {
+  /* ---------- utilidades ---------- */
+  const $ = id => document.getElementById(id);
+  const num = (v,d=1) => Number(v).toLocaleString('es-CL',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const signed = (v,d=0) => { const r=+Math.abs(v).toFixed(d); return `${r===0?'':v>0?'+':'−'}${num(Math.abs(v),d)}`; };
+  const clamp = (v,a,b) => Math.min(b,Math.max(a,v));
+  const C = 4200, LF = 334000;
+  const lerp = (a,b,t) => a.map((x,i)=>Math.round(x+(b[i]-x)*t));
+  const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+  const tempColor = T => T<15 ? rgb(lerp([214,239,246],[127,197,209],clamp(T/15,0,1)))
+                              : T<50 ? rgb(lerp([127,197,209],[238,186,120],(T-15)/35))
+                              : rgb(lerp([238,186,120],[228,100,60],clamp((T-50)/35,0,1)));
+  const gasColor = TK => tempColor(15+(TK-273)/627*75);
+  const setA = (id,attrs) => { const e=$(id); for(const k in attrs) e.setAttribute(k,attrs[k]); };
+  const show = (id,on) => { $(id).style.display = on ? '' : 'none'; };
+  const NS = 'http://www.w3.org/2000/svg';
+  const flame = id => `<g id="${id}"><g class="flicker"><path d="M0,0 C-13,-8 -11,-30 0,-50 C11,-30 13,-8 0,0Z" fill="#f39b4f" opacity=".92"/><path d="M0,0 C-6,-5 -5,-18 0,-30 C5,-18 6,-5 0,0Z" fill="#4f8fd6" opacity=".85"/></g></g>`;
+
+  /* ---------- gráficos ---------- */
+  if(window.Chart && Chart.defaults){
+    Chart.defaults.font.family='"Atkinson Hyperlegible", system-ui, sans-serif'; Chart.defaults.font.size=13; Chart.defaults.color='#566779';
+  }
+  const baseChart = (id,xTitle,yTitle,sets) => new Chart($(id),{
+    type:'line',data:{datasets:sets},options:{
+      responsive:true,maintainAspectRatio:false,animation:false,parsing:false,
+      plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:9}}},
+      scales:{x:{type:'linear',title:{display:true,text:xTitle},grid:{color:'#e6ecf2'}},
+              y:{title:{display:true,text:yTitle},grid:{color:'#e6ecf2'}}}
+    }
+  });
+  const series = (label,color) => ({label,data:[],borderColor:color,backgroundColor:color,pointRadius:0,borderWidth:3,tension:0});
+  const gasPath = series('Estado del gas','#2069a8');
+  gasPath.pointRadius = 3;
+  gasPath.segment = { borderDash: ctx => { const p=ctx.chart.data.datasets[ctx.datasetIndex].data[ctx.p1DataIndex]; return p && p.irr ? [6,5] : undefined; } };
+  const pextLine = series('Presión externa','#cf3e2e'); pextLine.borderWidth = 2; pextLine.borderDash = [4,4];
+  const charts = {
+    heat:baseChart('heat-chart','Tiempo (s)','Temperatura (°C)',[series('Vaso A','#2069a8'),series('Vaso B','#cf3e2e')]),
+    mix:baseChart('mix-chart','Progreso ilustrativo (s)','Temperatura (°C)',[series('Porción caliente','#cf3e2e'),series('Porción fría','#2069a8')]),
+    gas:baseChart('gas-chart','Volumen (L)','Presión (kPa)',[gasPath,pextLine])
+  };
+  charts.mix.data.datasets.forEach(d=>d.tension=.18);
+
+  /* =========================================================
+     01 · CALENTAMIENTO
+     ========================================================= */
+  const FLAME = ['Muy baja','Baja','Media','Alta','Máxima'], EFF = [1,.85,.7,.55,.4];
+  const h1 = { a:{m:.25,T:20}, b:{m:.5,T:20}, level:3, d:2, t:0, Q:0, timer:null, ptsA:[{x:0,y:20}], ptsB:[{x:0,y:20}] };
+  const power = () => h1.level*60*EFF[h1.d-1];
+
+  const heatRig = (k,cx,label) => `
+    <g id="jack-${k}">
+      <rect id="jack-${k}-top" x="${cx-34}" width="68" height="6" rx="2" fill="#9fb3b0"/>
+      <rect x="${cx-34}" y="324" width="68" height="6" rx="2" fill="#9fb3b0"/>
+      <line id="jack-${k}-l1" stroke="#7f9794" stroke-width="3"/><line id="jack-${k}-l2" stroke="#7f9794" stroke-width="3"/>
+    </g>
+    <g id="burner-${k}" class="slide">
+      <g transform="translate(${cx},0)">${flame('flame-'+k)}</g>
+      <rect x="${cx-11}" y="0" width="22" height="38" rx="3" fill="#4b6878"/>
+      <rect x="${cx-26}" y="36" width="52" height="8" rx="3" fill="#324e5f"/>
+      <circle cx="${cx+15}" cy="26" r="4" fill="#cf3e2e"/>
+    </g>
+    <line x1="${cx-65}" y1="172" x2="${cx-82}" y2="330" stroke="#566f7c" stroke-width="4" stroke-linecap="round"/>
+    <line x1="${cx+65}" y1="172" x2="${cx+82}" y2="330" stroke="#566f7c" stroke-width="4" stroke-linecap="round"/>
+    <rect x="${cx-78}" y="170" width="156" height="5" rx="2" fill="#566f7c"/>
+    <rect id="water-${k}" x="${cx-52}" width="104" rx="3"/>
+    <path d="M${cx-55},50 L${cx-55},164 Q${cx-55},170 ${cx-49},170 L${cx+49},170 Q${cx+55},170 ${cx+55},164 L${cx+55},50" fill="#ffffff55" stroke="#7d92a3" stroke-width="3"/>
+    ${[0,1,2,3].map(i=>`<line x1="${cx-55}" x2="${cx-45}" y1="${168-27.5*(i+1)}" y2="${168-27.5*(i+1)}" stroke="#7d92a3" stroke-width="1.5"/>`).join('')}
+    <g id="steam-${k}" class="steam" opacity="0" fill="none" stroke="#9fb3b0" stroke-width="3" stroke-linecap="round">
+      <path d="M${cx-25},44 q-6,-8 0,-14 q6,-7 0,-14"/><path d="M${cx},40 q-6,-8 0,-14 q6,-7 0,-14"/><path d="M${cx+22},44 q-6,-8 0,-14 q6,-7 0,-14"/>
+    </g>
+    <rect x="${cx+25}" y="22" width="8" height="140" rx="4" fill="#fff" stroke="#9aaeb5"/>
+    <rect id="therm-${k}" x="${cx+27}" width="4" fill="#d9534f"/>
+    <circle cx="${cx+29}" cy="162" r="7" fill="#d9534f"/>
+    <text x="${cx}" y="352" text-anchor="middle" font-weight="700" font-size="15" fill="${k==='a'?'#2069a8':'#cf3e2e'}">${label}</text>`;
+  $('heat-scene').innerHTML = `<svg class="lab-scene" viewBox="0 0 640 362" role="img" aria-label="Dos vasos con agua sobre trípodes y mecheros">
+    <line x1="20" y1="330" x2="620" y2="330" stroke="#c5d1cd" stroke-width="4"/>
+    ${heatRig('a',170,'Vaso A')}${heatRig('b',470,'Vaso B')}</svg>`;
+
+  function drawHeatScene(on){
+    [['a',170],['b',470]].forEach(([k,cx])=>{
+      const s=h1[k], hW=s.m*110;
+      setA('water-'+k,{y:168-hW,height:hW,fill:tempColor(s.T)});
+      const col=Math.max(4,clamp(s.T,0,100)/100*130);
+      setA('therm-'+k,{y:158-col,height:col});
+      $('steam-'+k).setAttribute('opacity',clamp((s.T-45)/40,0,.9));
+      const mouth=192+(h1.d-1)*16, top=mouth+44;
+      $('burner-'+k).style.transform=`translateY(${mouth}px)`;
+      $('jack-'+k+'-top').setAttribute('y',top);
+      setA('jack-'+k+'-l1',{x1:cx-30,y1:top+6,x2:cx+30,y2:324});
+      setA('jack-'+k+'-l2',{x1:cx+30,y1:top+6,x2:cx-30,y2:324});
+      $('flame-'+k).setAttribute('transform',`scale(${.8+h1.level*.08},${.4+h1.level*.17})`);
+      show('flame-'+k,on);
+    });
+  }
+  const heatButton=$('heat-play'), maxT=()=>Math.max(h1.a.T,h1.b.T);
+  function stopHeat(){ clearInterval(h1.timer); h1.timer=null; heatButton.textContent='Encender mecheros'; heating(); }
+  function heating(msg){
+    const P=power(), a=h1.a, b=h1.b, on=!!h1.timer;
+    $('flame-out').textContent=FLAME[h1.level-1]; $('dist-out').textContent=2*h1.d+' cm'; $('power-out').textContent=num(P,0)+' W';
+    $('mass-a-out').textContent=num(a.m*1000,0)+' mL'; $('mass-b-out').textContent=num(b.m*1000,0)+' mL';
+    $('flame-up').disabled=h1.level>=5; $('flame-down').disabled=h1.level<=1;
+    $('burner-closer').disabled=h1.d<=1; $('burner-farther').disabled=h1.d>=5;
+    $('heat-time').textContent=num(h1.t,0); $('temp-a').textContent=num(a.T); $('temp-b').textContent=num(b.T);
+    $('slope-a').textContent=num(on?P/(C*a.m):0,3); $('slope-b').textContent=num(on?P/(C*b.m):0,3);
+    $('heat-explain').textContent=`Ambos vasos recibieron la misma energía: Q = ${num(h1.Q,0)} J. Pero A tiene C = ${num(a.m*C,0)} J/K y B tiene C = ${num(b.m*C,0)} J/K: con igual potencia, sube más rápido el de menor capacidad calorífica.`;
+    if(msg!==undefined) $('heat-msg').textContent=msg;
+    drawHeatScene(on);
+    const ch=charts.heat;
+    ch.data.datasets[0].data=h1.ptsA; ch.data.datasets[1].data=h1.ptsB;
+    ch.options.scales.x.min=0; ch.options.scales.x.max=Math.max(240,Math.ceil(h1.t/60)*60);
+    ch.options.scales.y.min=15; ch.options.scales.y.max=Math.max(65,Math.ceil(maxT()/10)*10);
+    ch.update('none');
+  }
+  function heatTick(){
+    const P=power(),dt=5; h1.t+=dt; h1.Q+=P*dt;
+    ['a','b'].forEach(k=>h1[k].T+=P*dt/(h1[k].m*C));
+    h1.ptsA.push({x:h1.t,y:h1.a.T}); h1.ptsB.push({x:h1.t,y:h1.b.T});
+    if(maxT()>=95){ stopHeat(); heating('Los mecheros se apagaron: un vaso llegó a 95 °C.'); } else heating();
+  }
+  function resetHeat(){ clearInterval(h1.timer); h1.timer=null; heatButton.textContent='Encender mecheros';
+    h1.a.T=h1.b.T=20; h1.t=0; h1.Q=0; h1.ptsA=[{x:0,y:20}]; h1.ptsB=[{x:0,y:20}]; heating(''); }
+  heatButton.addEventListener('click',()=>{
+    if(h1.timer){ stopHeat(); heating('Mecheros apagados. Puedes encenderlos de nuevo para continuar.'); return; }
+    if(maxT()>=95) resetHeat();
+    heatButton.textContent='Apagar mecheros'; h1.timer=setInterval(heatTick,120); heating('');
+  });
+  $('heat-reset').addEventListener('click',resetHeat);
+  $('flame-up').addEventListener('click',()=>{h1.level=Math.min(5,h1.level+1);heating('');});
+  $('flame-down').addEventListener('click',()=>{h1.level=Math.max(1,h1.level-1);heating('');});
+  $('burner-closer').addEventListener('click',()=>{h1.d=Math.max(1,h1.d-1);heating('Mecheros más cerca: llega más energía a los vasos.');});
+  $('burner-farther').addEventListener('click',()=>{h1.d=Math.min(5,h1.d+1);heating('Mecheros más lejos: parte del calor se pierde en el aire.');});
+  document.querySelectorAll('[data-water]').forEach(btn=>btn.addEventListener('click',()=>{
+    const s=h1[btn.dataset.water], dm=+btn.dataset.dm, name='Vaso '+btn.dataset.water.toUpperCase();
+    if(dm>0){
+      if(s.m+dm>1.0001) return heating(`${name} está lleno (1000 mL).`);
+      s.T=(s.m*s.T+dm*20)/(s.m+dm); s.m=+(s.m+dm).toFixed(2);
+      const pts=btn.dataset.water==='a'?h1.ptsA:h1.ptsB; if(h1.t>0) pts.push({x:h1.t,y:s.T});
+      heating(h1.t>0?`Se vertió agua a 20 °C en ${name}: su temperatura baja y su masa aumenta.`:'');
+    } else {
+      if(s.m+dm<0.0999) return heating(`${name} debe conservar al menos 100 mL.`);
+      s.m=+(s.m+dm).toFixed(2); heating('');
+    }
+  }));
+
+  /* =========================================================
+     02 · EQUILIBRIO
+     ========================================================= */
+  const m2 = { hot:{m:.2,T:60}, cold:{m:.3,T:20}, step:0, timer:null };
+  $('mix-scene').innerHTML = `<svg class="lab-scene" viewBox="0 0 640 310" role="img" aria-label="Vaso caliente sobre placa calefactora y vaso frío">
+    <line x1="20" y1="290" x2="620" y2="290" stroke="#c5d1cd" stroke-width="4"/>
+    <rect x="100" y="248" width="160" height="42" rx="8" fill="#324e5f"/>
+    <rect id="plate-top" x="108" y="240" width="144" height="10" rx="3"/>
+    <circle cx="236" cy="270" r="9" fill="#cdd7e1"/><text x="140" y="275" font-size="11" font-weight="700" fill="#cdd7e1">Placa</text>
+    <line id="pour-stream" x1="421" y1="98" x2="428" y2="270" stroke-width="7" stroke-linecap="round" opacity="0"/>
+    <g id="hot-beaker">
+      <rect id="hot-water" x="143" width="74" rx="3"/>
+      <path d="M140,110 L140,235 Q140,240 145,240 L215,240 Q220,240 220,235 L220,110" fill="#ffffff55" stroke="#7d92a3" stroke-width="3"/>
+      <rect x="198" y="82" width="7" height="148" rx="3.5" fill="#fff" stroke="#9aaeb5"/>
+      <rect id="hot-therm" x="200" width="3" fill="#d9534f"/><circle cx="201.5" cy="232" r="6" fill="#d9534f"/>
+    </g>
+    <rect id="cold-water" x="393" width="154" rx="3"/>
+    <g id="ice-layer"></g>
+    <path d="M390,110 L390,284 Q390,290 396,290 L544,290 Q550,290 550,284 L550,110" fill="#ffffff55" stroke="#7d92a3" stroke-width="3"/>
+    <rect x="528" y="80" width="7" height="200" rx="3.5" fill="#fff" stroke="#9aaeb5"/>
+    <rect id="cold-therm" x="530" width="3" fill="#d9534f"/><circle cx="531.5" cy="282" r="6" fill="#d9534f"/>
+    <text x="180" y="304" text-anchor="middle" font-size="13" font-weight="700" fill="#b8321f">Vaso caliente</text>
+    <text x="470" y="304" text-anchor="middle" font-size="13" font-weight="700" fill="#2069a8">Vaso frío</text></svg>`;
+
+  const mixButton=$('mix-play');
+  function stopMix(){ clearInterval(m2.timer); m2.timer=null; mixButton.textContent=m2.step>0&&m2.step<40?'Continuar':'Verter y mezclar'; }
+  function mixing(msg){
+    const {m:mh,T:th}=m2.hot, {m:mc,T:tc}=m2.cold;
+    const tf=(mh*th+mc*tc)/(mh+mc), q=mh*C*(th-tf), f=1-Math.exp(-m2.step/9);
+    const hot=th+(tf-th)*f, cold=tc+(tf-tc)*f, poured=m2.step>0, pourF=Math.min(m2.step,10)/10;
+    $('hot-out').textContent=`${num(mh*1000,0)} mL a ${num(th,0)} °C`;
+    $('cold-out').textContent=`${num(mc*1000,0)} mL a ${num(tc,1)} °C`;
+    $('mix-final').textContent=num(tf); $('mix-q').textContent=num(q,0);
+    $('mix-hot-now').textContent=num(hot); $('mix-cold-now').textContent=num(cold);
+    if(msg!==undefined) $('mix-msg').textContent=msg;
+    // escena
+    $('plate-top').setAttribute('fill',rgb(lerp([214,140,110],[240,70,40],(th-40)/45)));
+    const hh=mh*120; setA('hot-water',{y:238-hh,height:hh,fill:tempColor(th),opacity:1-pourF});
+    $('hot-beaker').style.transform=poured?'translate(200px,-12px) rotate(80deg)':'';
+    setA('pour-stream',{stroke:tempColor(th),opacity:m2.step>=2&&m2.step<=10?.85:0});
+    const ch=(mc+mh*pourF)*60; setA('cold-water',{y:288-ch,height:ch,fill:tempColor(poured?cold*(1-pourF)+tf*pourF:tc)});
+    $('pour-stream').setAttribute('y2',288-ch);
+    const ht=Math.max(3,hot/100*140); setA('hot-therm',{y:228-ht,height:ht});
+    const ct=Math.max(3,cold/100*190); setA('cold-therm',{y:278-ct,height:ct});
+    // botones de preparación (bloqueados durante la mezcla)
+    ['hot-add','hot-remove','plate-up','plate-down','cold-add','cold-remove','ice-add'].forEach(id=>$(id).disabled=poured);
+    // gráfico
+    const pts=k=>Array.from({length:m2.step+1},(_,i)=>({x:i,y:k[0]+(tf-k[0])*(1-Math.exp(-i/9))}));
+    const c2=charts.mix; c2.data.datasets[0].data=pts([th]); c2.data.datasets[1].data=pts([tc]);
+    c2.options.scales.x.min=0; c2.options.scales.x.max=40; c2.options.scales.y.min=Math.max(0,Math.floor(tc-5)); c2.options.scales.y.max=th+5; c2.update('none');
+  }
+  mixButton.addEventListener('click',()=>{
+    if(m2.timer){ stopMix(); return; }
+    if(m2.step>=40) m2.step=0;
+    mixButton.textContent='Pausar';
+    m2.timer=setInterval(()=>{ m2.step++; mixing(m2.step===10?'La energía fluye de la porción caliente a la fría hasta igualar temperaturas.':undefined); if(m2.step>=40){ stopMix(); mixing('Equilibrio térmico alcanzado. Reinicia para preparar otra mezcla.'); } },90);
+    mixing('Vertiendo el agua caliente en el vaso frío…');
+  });
+  $('mix-reset').addEventListener('click',()=>{ clearInterval(m2.timer); m2.timer=null; m2.step=0; mixButton.textContent='Verter y mezclar';
+    Object.assign(m2.hot,{m:.2,T:60}); Object.assign(m2.cold,{m:.3,T:20}); $('ice-layer').innerHTML=''; mixing(''); });
+  const prep=(fn)=>()=>{ const msg=fn(); mixing(msg||''); };
+  $('hot-add').addEventListener('click',prep(()=>{ if(m2.hot.m>=0.999) return 'El vaso caliente está lleno (1000 mL).'; m2.hot.m=+(m2.hot.m+.05).toFixed(2); return 'La placa lleva el agua agregada a la misma temperatura.'; }));
+  $('hot-remove').addEventListener('click',prep(()=>{ if(m2.hot.m<=0.101) return 'Debe quedar al menos 100 mL.'; m2.hot.m=+(m2.hot.m-.05).toFixed(2); }));
+  $('plate-up').addEventListener('click',prep(()=>{ if(m2.hot.T>=85) return 'La placa ya está al máximo (85 °C).'; m2.hot.T+=5; }));
+  $('plate-down').addEventListener('click',prep(()=>{ if(m2.hot.T<=40) return 'Para que sea “caliente”, se mantiene sobre 40 °C.'; m2.hot.T-=5; }));
+  $('cold-add').addEventListener('click',prep(()=>{ const c=m2.cold; if(c.m>=0.999) return 'El vaso frío está lleno (1000 mL).';
+    c.T=(c.m*c.T+.05*20)/(c.m+.05); c.m=+(c.m+.05).toFixed(2); return 'Se agregó agua de grifo a 20 °C.'; }));
+  $('cold-remove').addEventListener('click',prep(()=>{ if(m2.cold.m<=0.101) return 'Debe quedar al menos 100 mL.'; m2.cold.m=+(m2.cold.m-.05).toFixed(2); }));
+  $('ice-add').addEventListener('click',prep(()=>{
+    const c=m2.cold, mi=.01;
+    if(c.m+mi>1.0001) return 'El vaso frío está lleno.';
+    const Tn=(c.m*C*c.T-mi*LF)/((c.m+mi)*C);
+    if(Tn<1) return 'El agua ya está casi a 0 °C: otro cubo no alcanzaría a fundirse por completo.';
+    const melt=mi*LF;
+    c.T=Tn; c.m=+(c.m+mi).toFixed(3);
+    const top=288-c.m*60, cube=document.createElementNS(NS,'rect');
+    for(const [k,v] of Object.entries({x:400+Math.random()*110,y:top-8,width:15,height:13,rx:3,fill:'#eefafd',stroke:'#8fcbd8','stroke-width':1.5,class:'ice-cube'})) cube.setAttribute(k,v);
+    cube.addEventListener('animationend',()=>cube.remove()); $('ice-layer').appendChild(cube);
+    return `El hielo absorbió ${num(melt,0)} J solo para fundirse; el agua bajó a ${num(Tn,1)} °C.`;
+  }));
+
+  /* =========================================================
+     03 · GAS Y PISTÓN (aire ideal diatómico, U = 2,5·p·V; 1 kPa·L = 1 J)
+     ========================================================= */
+  const VMIN=1, VMAX=8;
+  const g0 = () => ({p:100,V:2,pext:100,locked:false,heat:false,cool:false,Q:0,W:0,timer:null,path:[{x:2,y:100}],action:'Gas en equilibrio con la presión externa'});
+  let g = g0();
+  const TK = () => 1.5*g.p*g.V;   // 300 K a 100 kPa y 2 L
+  $('gas-scene').innerHTML = `<svg class="lab-scene" viewBox="0 0 240 380" role="img" aria-label="Cilindro con gas, pistón, pesas y fuente de calor">
+    <g id="ice-bath" style="display:none"><rect x="36" y="200" width="168" height="112" rx="10" fill="#bfe3ee" opacity=".75"/>
+      ${[[44,214],[186,230],[46,258],[184,272],[52,292],[180,296]].map(([x,y])=>`<rect x="${x-6}" y="${y}" width="13" height="12" rx="3" fill="#eefafd" stroke="#8fcbd8"/>`).join('')}</g>
+    <rect id="gas-fill" x="62" width="116"/>
+    <g id="particles"></g>
+    <line x1="60" y1="40" x2="60" y2="302" stroke="#7d92a3" stroke-width="5"/><line x1="180" y1="40" x2="180" y2="302" stroke="#7d92a3" stroke-width="5"/>
+    <line x1="58" y1="300" x2="182" y2="300" stroke="#7d92a3" stroke-width="5"/>
+    <path d="M62,52 l8,8 l-8,0z M178,52 l-8,8 l8,0z" fill="#9aaeb5"/>
+    <g id="gas-top"><rect id="gas-piston" x="62" y="-14" width="116" height="14" rx="2" fill="#324e5f"/>
+      ${[0,1,2,3,4,5].map(i=>`<rect id="w${i}" x="80" y="${-14-(i+1)*13}" width="80" height="12" rx="2" fill="#6b5b4b" stroke="#4d3f33"/>`).join('')}
+      <rect id="pin-l" x="46" y="-11" width="18" height="7" rx="2" fill="#cf3e2e"/><rect id="pin-r" x="176" y="-11" width="18" height="7" rx="2" fill="#cf3e2e"/></g>
+    <g id="gas-burner"><g transform="translate(120,322) scale(.9,.42)">${flame('gas-flame')}</g>
+      <rect x="109" y="322" width="22" height="36" rx="3" fill="#4b6878"/><rect x="94" y="356" width="52" height="8" rx="3" fill="#324e5f"/></g>
+    <line x1="10" y1="366" x2="230" y2="366" stroke="#c5d1cd" stroke-width="4"/></svg>`;
+  const parts=[...Array(14)].map((_,i)=>{ const c=document.createElementNS(NS,'circle'); c.setAttribute('r',3); c.setAttribute('fill','#7a3b22'); c.setAttribute('opacity','.55'); $('particles').appendChild(c); return {c,x:Math.random(),y:Math.random()}; });
+  function drawParticles(){ const yb=300-g.V*30, h=300-yb, amp=.07*Math.sqrt(TK()/300);
+    parts.forEach(pt=>{ pt.x=clamp(pt.x+(Math.random()-.5)*2*amp,.06,.94); pt.y=clamp(pt.y+(Math.random()-.5)*2*amp,.06,.94);
+      pt.c.setAttribute('cx',62+pt.x*116); pt.c.setAttribute('cy',yb+pt.y*h); }); }
+  setInterval(()=>{ if($('gas').classList.contains('active')) drawParticles(); },130);
+
+  function pushPath(irr){ const last=g.path[g.path.length-1];
+    if(irr || Math.abs(last.x-g.V)>0.02 || Math.abs(last.y-g.p)>1) g.path.push({x:g.V,y:g.p,irr:!!irr}); }
+  function applyQ(dQ){
+    g.Q+=dQ; let rem=dQ;
+    for(let k=0;k<5 && Math.abs(rem)>1e-9;k++){
+      if(g.locked){ g.p+=rem/(2.5*g.V); rem=0; break; }
+      if(Math.abs(g.p-g.pext)<1e-6){
+        if((g.V>=VMAX-1e-9&&rem>0)||(g.V<=VMIN+1e-9&&rem<0)){ g.p+=rem/(2.5*g.V); rem=0; break; }   // apoyado en un tope
+        const Vn=g.V+rem/(3.5*g.pext), Vt=clamp(Vn,VMIN,VMAX);
+        g.W+=g.pext*(Vt-g.V); rem-=3.5*g.pext*(Vt-g.V); g.V=Vt; g.p=g.pext;
+      } else {
+        const need=2.5*g.V*(g.pext-g.p);          // calor para que la presión del gas iguale la externa
+        if((need>0&&rem>need)||(need<0&&rem<need)){ g.p=g.pext; rem-=need; } else { g.p+=rem/(2.5*g.V); rem=0; }
+      }
+    }
+  }
+  function equilibrate(){
+    if(g.locked || Math.abs(g.p-g.pext)<1e-6) return;
+    const Vi=g.V, pi=g.p, pe=g.pext;
+    let Vf=Vi*(2.5*pi+pe)/(3.5*pe), pf=pe;
+    if(Vf>VMAX||Vf<VMIN){ Vf=clamp(Vf,VMIN,VMAX); pf=(2.5*pi*Vi-pe*(Vf-Vi))/(2.5*Vf); }
+    if(Math.abs(Vf-Vi)<1e-9 && Math.abs(pf-pi)<1e-9) return;
+    g.W+=pe*(Vf-Vi); g.V=Vf; g.p=pf;
+    g.action = Vf<Vi ? 'Compresión brusca: el entorno realiza trabajo' : 'Expansión brusca: el gas realiza trabajo';
+    pushPath(true);
+  }
+  function setHeater(kind,on){
+    g.heat = kind==='heat' ? on : (on?false:g.heat);
+    g.cool = kind==='cool' ? on : (on?false:g.cool);
+    clearInterval(g.timer); g.timer=null;
+    if(g.heat||g.cool) g.timer=setInterval(gasTick,100);
+  }
+  function gasTick(){
+    let msg;
+    applyQ(g.heat?30:-30);
+    if(g.locked) g.action = g.heat ? 'Volumen constante: Q aumenta la energía interna' : 'Volumen constante: el gas cede energía';
+    else if(g.V>=VMAX-1e-9 && g.heat) g.action='Pistón en el tope: ahora sube la presión';
+    else if(g.V<=VMIN+1e-9 && g.cool) g.action='Pistón en el tope inferior: baja la presión';
+    else g.action = g.heat ? 'Expansión: el gas realiza trabajo' : 'Compresión: el entorno realiza trabajo';
+    if(g.heat && (TK()>=900 || g.p>=400)){ setHeater('heat',false); msg='Válvula de seguridad: el mechero se apagó (gas a 900 K o 400 kPa).'; }
+    if(g.cool && TK()<=273){ setHeater('cool',false); msg='El gas ya está a 273 K: un baño de hielo no puede enfriarlo más.'; }
+    pushPath(false); gasRender(msg);
+  }
+  function gasRender(msg){
+    const T=TK(), yb=300-g.V*30, n=Math.round((g.pext-100)/25), dU=2.5*g.p*g.V-500, dV=g.V-2;
+    setA('gas-fill',{y:yb,height:300-yb,fill:gasColor(T)});
+    $('gas-top').setAttribute('transform',`translate(0,${yb})`);
+    for(let i=0;i<6;i++) show('w'+i,i<n);
+    show('pin-l',g.locked); show('pin-r',g.locked);
+    show('gas-burner',true); show('gas-flame',g.heat); show('ice-bath',g.cool);
+    $('pressure-out').textContent=g.pext+' kPa'+(n?`, ${n} pesa${n>1?'s':''}`:'');
+    $('weight-add').disabled=g.pext>=250; $('weight-remove').disabled=g.pext<=100;
+    $('gas-burner').setAttribute('aria-pressed',g.heat); $('gas-ice').setAttribute('aria-pressed',g.cool);
+    $('gas-lock').setAttribute('aria-pressed',g.locked); $('lock-out').textContent=g.locked?'Trabado':'Libre';
+    $('gas-lock').lastChild.textContent=g.locked?'Destrabar pistón':'Trabar pistón';
+    $('gas-q-out').textContent=signed(g.Q)+' J';
+    $('gas-dv').textContent=signed(dV,2)+' L'; $('gas-work').textContent=signed(g.W)+' J'; $('gas-heat').textContent=signed(g.Q)+' J'; $('gas-du').textContent=signed(dU)+' J';
+    $('gas-state').textContent=`Gas: p = ${num(g.p,0)} kPa, V = ${num(g.V,2)} L, T = ${num(T,0)} K`;
+    $('gas-direction').textContent=g.action;
+    $('gas-explain').textContent=`Sistema: el gas. W = Σ pext·ΔV = ${signed(g.W)} J (1 kPa·L = 1 J). ΔU = Q − W = ${signed(g.Q)} − (${signed(g.W)}) = ${signed(dU)} J. ${dU>0.5?'La energía interna aumenta: el gas está más caliente.':dU<-0.5?'La energía interna disminuye: el gas está más frío.':'La energía interna no cambia.'}`;
+    if(msg!==undefined) $('gas-msg').textContent=msg;
+    const ch=charts.gas; ch.data.datasets[0].data=g.path; ch.data.datasets[1].data=[{x:0,y:g.pext},{x:9,y:g.pext}];
+    ch.options.scales.x.min=0; ch.options.scales.x.max=9; ch.options.scales.y.min=0; ch.options.scales.y.max=Math.max(300,Math.ceil(Math.max(g.p,g.pext)/50)*50+50); ch.update('none');
+  }
+  $('weight-add').addEventListener('click',()=>{ g.pext=Math.min(250,g.pext+25); if(g.locked) g.action='Pistón trabado: las pesas no lo mueven'; equilibrate(); gasRender(g.locked?'Al destrabar, el pistón bajará de golpe.':''); });
+  $('weight-remove').addEventListener('click',()=>{ g.pext=Math.max(100,g.pext-25); if(g.locked) g.action='Pistón trabado: las pesas no lo mueven'; equilibrate(); gasRender(g.locked?'Al destrabar, el pistón subirá de golpe.':''); });
+  $('gas-burner').addEventListener('click',()=>{ const on=!g.heat; if(on&&(TK()>=900||g.p>=400)) return gasRender('El gas ya está en el límite de seguridad.'); setHeater('heat',on); if(!on) g.action='Mechero apagado'; gasRender(''); });
+  $('gas-ice').addEventListener('click',()=>{ const on=!g.cool; if(on&&TK()<=273) return gasRender('El gas ya está a la temperatura del hielo.'); setHeater('cool',on); if(!on) g.action='Baño de hielo retirado'; gasRender(''); });
+  $('gas-lock').addEventListener('click',()=>{ g.locked=!g.locked; g.action=g.locked?'Pistón trabado: volumen constante, W = 0':'Pistón libre'; equilibrate(); gasRender(''); });
+  $('gas-reset').addEventListener('click',()=>{ clearInterval(g.timer); g=g0(); gasRender(''); });
+
+  /* =========================================================
+     04 · CARNOT
+     ========================================================= */
+  const c4 = { th:600, tc:300, qh:1000 };
+  $('carnot-scene').innerHTML = `<svg class="lab-scene" viewBox="0 0 640 260" role="img" aria-label="Fuente caliente, máquina térmica y fuente fría con flujos de energía">
+    <defs>${[['hot','#cf3e2e'],['cold','#2069a8'],['ink','#1b2a3a']].map(([n,c])=>`<marker id="ah-${n}" viewBox="0 0 10 10" refX="4" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto"><path d="M0,0 L10,5 L0,10z" fill="${c}"/></marker>`).join('')}</defs>
+    <rect x="20" y="40" width="150" height="110" rx="16" fill="#fbe7e3" stroke="#cf3e2e" stroke-width="2"/>
+    <text x="95" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="#b8321f">Fuente caliente</text>
+    <text id="c-hot-t" x="95" y="112" text-anchor="middle" font-size="24" font-weight="700" fill="#1b2a3a">600 K</text>
+    <g transform="translate(95,192)">${flame('c-flame')}</g>
+    <rect x="84" y="192" width="22" height="34" rx="3" fill="#4b6878"/><rect x="70" y="224" width="50" height="8" rx="3" fill="#324e5f"/>
+    <text x="320" y="30" text-anchor="middle" font-size="13" font-weight="700" fill="#1b2a3a">Máquina ideal</text>
+    <g id="flywheel" class="spin"><circle cx="320" cy="95" r="46" fill="#fff" stroke="#1b2a3a" stroke-width="6"/>
+      ${[0,45,90,135].map(a=>`<line x1="${320-42*Math.cos(a*Math.PI/180)}" y1="${95-42*Math.sin(a*Math.PI/180)}" x2="${320+42*Math.cos(a*Math.PI/180)}" y2="${95+42*Math.sin(a*Math.PI/180)}" stroke="#1b2a3a" stroke-width="3"/>`).join('')}
+      <circle cx="320" cy="95" r="9" fill="#1b2a3a"/><circle cx="320" cy="56" r="5" fill="#cf3e2e"/></g>
+    <rect id="c-cold-box" x="470" y="40" width="150" height="110" rx="16" stroke="#2069a8" stroke-width="2"/>
+    <g id="c-ice">${[[488,128],[512,134],[580,130],[600,124]].map(([x,y])=>`<rect x="${x}" y="${y}" width="14" height="12" rx="3" fill="#eefafd" stroke="#8fcbd8"/>`).join('')}</g>
+    <g id="c-fog" fill="#ffffff" opacity=".7"><ellipse cx="505" cy="44" rx="26" ry="8"/><ellipse cx="580" cy="42" rx="30" ry="9"/></g>
+    <text x="545" y="76" text-anchor="middle" font-size="13" font-weight="700" fill="#2069a8">Fuente fría</text>
+    <text id="c-cold-t" x="545" y="112" text-anchor="middle" font-size="24" font-weight="700" fill="#1b2a3a">300 K</text>
+    <text id="c-cold-name" x="545" y="185" text-anchor="middle" font-size="12" fill="#566779">Agua ambiente</text>
+    <line id="arr-qh" x1="172" y1="95" x2="258" y2="95" stroke="#cf3e2e" stroke-linecap="round" marker-end="url(#ah-hot)"/>
+    <line id="arr-qc" x1="376" y1="95" x2="456" y2="95" stroke="#2069a8" stroke-linecap="round" marker-end="url(#ah-cold)"/>
+    <line id="arr-w" x1="320" y1="152" x2="320" y2="222" stroke="#1b2a3a" stroke-linecap="round" marker-end="url(#ah-ink)"/>
+    <text id="t-qh" x="215" y="70" text-anchor="middle" font-size="13" font-weight="700" fill="#b8321f">Qh</text>
+    <text id="t-qc" x="416" y="70" text-anchor="middle" font-size="13" font-weight="700" fill="#2069a8">Qc</text>
+    <text id="t-w" x="338" y="200" font-size="13" font-weight="700" fill="#1b2a3a">W</text></svg>`;
+  const BATHS = {195:['Hielo seco','#e3eef6'],273:['Agua con hielo','#d6eef4'],300:['Agua ambiente','#cfe6ea'],330:['Agua tibia','#f1e3d8']};
+  function carnot(msg){
+    const {th,tc,qh}=c4, eta=1-tc/th, w=qh*eta, qc=qh-w;
+    $('th-out').textContent=th+' K'; $('tc-out').textContent=tc+' K'; $('qh-out').textContent=num(qh,0)+' J';
+    $('th-up').disabled=th>=900; $('th-down').disabled=th<=350; $('qh-up').disabled=qh>=3000; $('qh-down').disabled=qh<=200;
+    document.querySelectorAll('[data-tc]').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.tc===tc)));
+    $('carnot-hot').textContent=th+' K'; $('carnot-cold').textContent=tc+' K'; $('carnot-eff').textContent=num(eta*100)+' %';
+    $('carnot-in').textContent=num(qh,0)+' J'; $('carnot-work').textContent=num(w,1)+' J'; $('carnot-out').textContent=num(qc,1)+' J';
+    $('work-bar').style.width=eta*100+'%'; $('cold-bar').style.width=(1-eta)*100+'%';
+    $('entropy-hot').textContent=signed(-qh/th,2); $('entropy-cold').textContent=signed(qc/tc,2); $('entropy-total').textContent=num(0,2);
+    // escena
+    $('c-hot-t').textContent=th+' K'; $('c-cold-t').textContent=tc+' K';
+    $('c-flame').setAttribute('transform',`scale(${.8+(th-350)/550*.5},${.45+(th-350)/550*.85})`);
+    const [name,fill]=BATHS[tc]; $('c-cold-box').setAttribute('fill',fill); $('c-cold-name').textContent=name;
+    show('c-ice',tc<=273); show('c-fog',tc===195);
+    const sw=e=>4+e/3000*20;
+    $('arr-qh').setAttribute('stroke-width',sw(qh)); $('arr-qc').setAttribute('stroke-width',sw(qc)); $('arr-w').setAttribute('stroke-width',sw(w));
+    $('t-qh').textContent=`Qh = ${num(qh,0)} J`; $('t-qc').textContent=`Qc = ${num(qc,0)} J`; $('t-w').textContent=`W = ${num(w,0)} J`;
+    $('flywheel').style.animationDuration=clamp(4.5-w/450,0.5,4.5)+'s';
+    if(msg!==undefined) $('carnot-constraint').textContent=msg;
+  }
+  $('th-up').addEventListener('click',()=>{ c4.th=Math.min(900,c4.th+50); carnot('Fuente caliente más caliente: aumenta la eficiencia máxima.'); });
+  $('th-down').addEventListener('click',()=>{ c4.th=Math.max(350,c4.th-50); carnot('Fuente caliente más fría: disminuye la eficiencia máxima.'); });
+  $('qh-up').addEventListener('click',()=>{ c4.qh=Math.min(3000,c4.qh+100); carnot('Más calor por ciclo: más trabajo, pero la eficiencia no cambia.'); });
+  $('qh-down').addEventListener('click',()=>{ c4.qh=Math.max(200,c4.qh-100); carnot('Menos calor por ciclo: menos trabajo, misma eficiencia.'); });
+  document.querySelectorAll('[data-tc]').forEach(b=>b.addEventListener('click',()=>{ c4.tc=+b.dataset.tc; carnot(`Fuente fría: ${BATHS[c4.tc][0].toLowerCase()} a ${c4.tc} K.`); }));
+
+  /* =========================================================
+     05–09 · LEYES DE LOS GASES  (gas ideal: p·V = n·R·T; 1 kPa·L = 1 J)
+     ========================================================= */
+  const R = 8.314, N0 = 200/(R*300), VMAXL = 4.4;
+  const TEMP_BTNS = [
+    {act:'heat',icon:'flame',label:'Calentar con mechero (+25 K)',wide:true},
+    {act:'room',icon:'sun',label:'Ambiente 300 K'},
+    {act:'ice',icon:'snowflake',label:'Agua con hielo 273 K'},
+    {act:'dry',icon:'thermometer-snowflake',label:'Baño de hielo seco 195 K',wide:true}];
+  const LAWS = {
+    gl:{ num:'05', law:'Ley de Gay-Lussac', heading:'Presión y temperatura', mode:'rigid', pmax:250,
+      desc:'Un recipiente rígido de acero, cerrado y con manómetro. Caliéntalo con el mechero o sumérgelo en baños fríos: el volumen no puede cambiar.',
+      eq:'p₁ / T₁ = p₂ / T₂', fixed:'V y n constantes',
+      groups:[{label:'Temperatura del gas',out:'t-out',buttons:TEMP_BTNS}],
+      metrics:['Presión p','Temperatura T','Volumen V (fijo)','p / T (constante)'],
+      note:'Gas ideal: 0,080 mol de aire en 2 L. La ley se cumple con temperaturas en kelvin. Válvula de seguridad: no se calienta sobre 600 K.',
+      chartLabel:'Gráfico de presión frente a temperatura absoluta',
+      x:{title:'Temperatura (K)',min:0,max:650}, y:{title:'Presión (kPa)',min:0,max:250},
+      scene:{rigid:true,burner:true,bath:true,label:'Recipiente rígido con manómetro sobre un mechero'}, pt:s=>({x:s.T,y:s.p}) },
+    ch:{ num:'06', law:'Ley de Charles', heading:'Volumen y temperatura', mode:'free', pmax:250,
+      desc:'Un cilindro con un pistón que se desliza libremente, así que la presión se mantiene en 100 kPa. Calienta o enfría el gas y observa el pistón.',
+      eq:'V₁ / T₁ = V₂ / T₂', fixed:'p y n constantes',
+      groups:[{label:'Temperatura del gas',out:'t-out',buttons:TEMP_BTNS}],
+      metrics:['Volumen V','Temperatura T','Presión p (fija)','V / T (constante)'],
+      note:'Gas ideal: 0,080 mol de aire a 100 kPa (atmósfera + pistón), pistón sin fricción. Si prolongas la recta, el volumen llegaría a 0 en 0 K (−273 °C).',
+      chartLabel:'Gráfico de volumen frente a temperatura absoluta',
+      x:{title:'Temperatura (K)',min:0,max:650}, y:{title:'Volumen (L)',min:0,max:4.5},
+      scene:{burner:true,bath:true,label:'Cilindro con pistón libre sobre un mechero'}, pt:s=>({x:s.T,y:s.V}) },
+    by:{ num:'07', law:'Ley de Boyle', heading:'Presión y volumen', mode:'volume', pmax:450,
+      desc:'Una jeringa grande y sellada con manómetro. Empuja o tira del émbolo lentamente y lee la presión: la temperatura del gas no cambia.',
+      eq:'p₁·V₁ = p₂·V₂', fixed:'T y n constantes',
+      groups:[{label:'Émbolo de la jeringa',out:'v-out',buttons:[{act:'push',icon:'chevrons-down',label:'Empujar (−0,25 L)'},{act:'pull',icon:'chevrons-up',label:'Tirar (+0,25 L)'}],
+               note:'Al moverlo despacio, el gas intercambia calor con el aire del laboratorio y se mantiene a 300 K.'}],
+      metrics:['Presión p','Volumen V','Temperatura T (fija)','p·V (constante)'],
+      note:'Gas ideal: 0,080 mol de aire a 300 K. El émbolo recorre de 0,5 L a 4 L.',
+      chartLabel:'Gráfico de presión frente a volumen',
+      x:{title:'Volumen (L)',min:0,max:4.5}, y:{title:'Presión (kPa)',min:0,max:450},
+      scene:{hand:true,label:'Jeringa sellada con émbolo y manómetro'}, pt:s=>({x:s.V,y:s.p}) },
+    av:{ num:'08', law:'Ley de Avogadro', heading:'Volumen y cantidad de gas', mode:'free', pmax:250,
+      desc:'Un tanque de gas conectado a un cilindro con pistón libre. Inyecta o libera gas a presión y temperatura constantes y observa el volumen.',
+      eq:'V₁ / n₁ = V₂ / n₂', fixed:'p y T constantes',
+      groups:[{label:'Cantidad de gas',out:'n-out',buttons:[{act:'inject',icon:'plus',label:'Inyectar 0,01 mol'},{act:'release',icon:'wind',label:'Liberar 0,01 mol'}],
+               note:'El gas que entra o sale está a 300 K, y el pistón libre mantiene 100 kPa.'}],
+      metrics:['Volumen V','Cantidad n','Presión y temperatura (fijas)','V / n (constante)'],
+      note:'A 100 kPa y 300 K, un mol de cualquier gas ideal ocupa unos 24,9 L, sea del gas que sea. Cada punto del cilindro representa 0,01 mol.',
+      chartLabel:'Gráfico de volumen frente a cantidad de gas',
+      x:{title:'Cantidad de gas (mol)',min:0,max:0.18}, y:{title:'Volumen (L)',min:0,max:4.5},
+      scene:{tank:true,label:'Tanque de gas conectado a un cilindro con pistón libre'}, pt:s=>({x:s.n,y:s.V}) },
+    cb:{ num:'09', law:'Ley general de los gases', heading:'Ley combinada', mode:'free', pmax:300,
+      desc:'Pesas y temperatura sobre el mismo cilindro. Guarda un estado inicial, cambia dos variables a la vez y comprueba que pV/T se conserva.',
+      eq:'p₁·V₁ / T₁ = p₂·V₂ / T₂', fixed:'n constante',
+      groups:[{label:'Pesas sobre el pistón',out:'w-out',buttons:[{act:'wadd',icon:'plus',label:'Poner pesa'},{act:'wrem',icon:'minus',label:'Quitar pesa'}],note:'Cada pesa suma 25 kPa (atmósfera + pistón = 100 kPa).'},
+              {label:'Temperatura del gas',out:'t-out',buttons:TEMP_BTNS},
+              {label:'Comparación',out:'s1-out',buttons:[{act:'save',icon:'save',label:'Guardar estado actual como estado 1',wide:true}]}],
+      metrics:['Presión p','Volumen V','Temperatura T','p·V / T (constante)'],
+      note:'Gas ideal: 0,080 mol de aire. Cada cambio es lento: el gas queda en equilibrio antes de medir. Boyle, Charles y Gay-Lussac son casos particulares de esta ley.',
+      chartLabel:'Gráfico del valor de pV/T en cada medición',
+      x:{title:'Medición n.°',min:0,max:10}, y:{title:'p·V / T (J/K)',min:0,max:1},
+      scene:{weights:true,burner:true,bath:true,label:'Cilindro con pesas sobre el pistón y mechero'}, pt:s=>({x:0,y:s.p*s.V/s.T}) }
+  };
+  const degC = T => `${T-273.15<-0.5?'−':''}${num(Math.abs(T-273.15),0)} °C`;
+  const fmtT = T => `${num(T,0)} K (${degC(T)})`;
+  const lawSectionHTML = (k,c) => `
+    <section id="${k}" class="station" aria-labelledby="${k}-title">
+     <div class="grid lg:grid-cols-[330px_1fr] gap-5">
+      <div class="surface canva-panel rounded-xl p-6" data-template-id="${k}-controls">
+       <span data-template-id="${k}-kicker" class="canva-tag">Actividad ${+c.num}: ${c.heading.toLowerCase()}</span>
+       <h2 id="${k}-title" data-template-id="${k}-title" class="canva-text mt-3 mb-2">${c.law}</h2>
+       <p data-template-id="${k}-description" class="canva-text mb-6 leading-relaxed">${c.desc}</p>
+       <div class="space-y-5">${c.groups.map(g=>`
+        <div>
+         <p class="group-label"><span>${g.label}</span><output id="${k}-${g.out}"></output></p>
+         <div class="grid grid-cols-2 gap-2">${g.buttons.map(b=>`<button type="button" class="tool${b.wide?' col-span-2':''}" data-law="${k}" data-act="${b.act}"><i data-lucide="${b.icon}"></i>${b.label}</button>`).join('')}</div>
+         ${g.note?`<p class="text-xs text-[#566779] mt-2">${g.note}</p>`:''}
+        </div>`).join('')}
+       </div>
+       <div class="flex gap-2 mt-6"><button type="button" class="canva-button rounded-lg px-5 py-3 font-bold border border-[#cdd7e1] hover:bg-[#eef2f6]" data-law="${k}" data-act="reset">Reiniciar</button></div>
+       <p id="${k}-msg" class="lab-msg mt-3" aria-live="polite"></p>
+       <p data-template-id="${k}-note" class="canva-text mt-3 leading-relaxed text-sm text-[#566779]">${c.note}</p>
+      </div>
+      <div class="surface canva-panel rounded-xl p-6 md:p-8" data-template-id="${k}-display">
+       <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <p data-template-id="${k}-equation" class="canva-text equation">${c.eq}</p>
+        <span class="badge-fixed">${c.fixed}</span>
+       </div>
+       <div class="grid sm:grid-cols-[230px_1fr] gap-6 items-start">
+        <div id="${k}-scene" class="w-full"></div>
+        <div>
+         <div class="grid grid-cols-2 gap-3 mb-3">${c.metrics.map((m,i)=>`<div class="metric${i===3?' metric-key':''}"><p class="text-sm">${m}</p><p class="text-xl font-bold readout" id="${k}-m${i}"></p></div>`).join('')}</div>
+         ${k==='cb'?'<div id="cb-states" class="metric mb-3 overflow-x-auto"></div>':''}
+         <div class="chart-box"><canvas id="${k}-chart" role="img" aria-label="${c.chartLabel}"></canvas></div>
+         <p id="${k}-trend-hint" class="text-xs text-[#566779] mt-2" aria-live="polite"></p>
+        </div>
+       </div>
+       <p id="${k}-explain" class="text-sm text-[#566779] mt-5" aria-live="polite"></p>
+      </div>
+     </div>
+    </section>`;
+  const lawScene = (k,o) => {
+    const lidY = 320-2/VMAXL*270;
+    const cubes = [[56,214],[214,232],[58,262],[212,280],[62,300],[208,306]].map(([x,y])=>`<rect x="${x-6}" y="${y}" width="13" height="12" rx="3" fill="#eefafd" stroke="#8fcbd8"/>`).join('');
+    const ticks = [...Array(9)].map((_,i)=>{ const a=(-120+i*30)*Math.PI/180; return `<line x1="${262+30*Math.sin(a)}" y1="${96-30*Math.cos(a)}" x2="${262+24*Math.sin(a)}" y2="${96-24*Math.cos(a)}" stroke="#566779" stroke-width="2"/>`; }).join('');
+    return `<svg class="lab-scene" viewBox="0 0 320 380" role="img" aria-label="${o.label}">
+      <text id="${k}-temp-t" x="12" y="24" font-size="13" font-weight="700" fill="#1b2a3a"></text>
+      ${o.burner?`<g id="${k}-burner-flame" style="display:none"><g transform="translate(140,334)">${flame(k+'-flame')}</g></g>
+        <rect x="129" y="334" width="22" height="32" rx="3" fill="#4b6878"/><rect x="114" y="364" width="52" height="8" rx="3" fill="#324e5f"/>`:''}
+      ${o.bath?`<g id="${k}-bath" style="display:none"><rect id="${k}-bath-r" x="44" y="196" width="192" height="140" rx="12" opacity=".85"/>${cubes}
+        <g id="${k}-fog" fill="#ffffff" opacity=".8"><ellipse cx="82" cy="198" rx="30" ry="8"/><ellipse cx="198" cy="196" rx="32" ry="9"/></g></g>`:''}
+      ${o.tank?`<rect x="6" y="214" width="40" height="120" rx="16" fill="#6d8794"/><rect x="18" y="200" width="16" height="16" rx="3" fill="#4b6878"/><circle cx="26" cy="196" r="6" fill="#cf3e2e"/>
+        <path d="M26,190 L26,178 Q26,170 34,170 L56,170 Q64,170 64,178 L64,306 L72,306" fill="none" stroke="#324e5f" stroke-width="4"/>
+        <text x="26" y="352" text-anchor="middle" font-size="10" font-weight="700" fill="#566779">Tanque</text>`:''}
+      <rect id="${k}-gas" x="72" width="136" ${o.rigid?`y="${lidY}" height="${320-lidY}"`:''}/>
+      <g id="${k}-parts"></g>
+      <line x1="70" y1="${o.rigid?lidY-16:40}" x2="70" y2="322" stroke="#7d92a3" stroke-width="5"/>
+      <line x1="210" y1="${o.rigid?lidY-16:40}" x2="210" y2="322" stroke="#7d92a3" stroke-width="5"/>
+      <line x1="68" y1="320" x2="212" y2="320" stroke="#7d92a3" stroke-width="5"/>
+      ${o.rigid?`<rect x="62" y="${lidY-16}" width="156" height="16" rx="3" fill="#324e5f"/>${[78,110,170,202].map(x=>`<circle cx="${x}" cy="${lidY-8}" r="3.5" fill="#c9d6d3"/>`).join('')}`
+        :`<g id="${k}-top"><rect x="72" y="-14" width="136" height="14" rx="2" fill="#324e5f"/>
+          ${o.hand?'<rect x="136" y="-56" width="8" height="42" fill="#7d92a3"/><rect x="108" y="-66" width="64" height="12" rx="6" fill="#324e5f"/>':''}
+          ${o.weights?[0,1,2,3,4,5].map(i=>`<rect id="${k}-w${i}" x="96" y="${-14-(i+1)*13}" width="88" height="12" rx="2" fill="#6b5b4b" stroke="#4d3f33"/>`).join(''):''}</g>`}
+      <path d="M210,300 L262,300 L262,130" fill="none" stroke="#9aaeb5" stroke-width="4"/>
+      <text x="262" y="52" text-anchor="middle" font-size="9" font-weight="700" fill="#566779">Manómetro</text>
+      <circle cx="262" cy="96" r="34" fill="#ffffff" stroke="#324e5f" stroke-width="3"/>${ticks}
+      <line id="${k}-needle" x1="262" y1="96" x2="262" y2="70" stroke="#cf3e2e" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="262" cy="96" r="4" fill="#324e5f"/>
+      <text id="${k}-gauge-t" x="262" y="118" text-anchor="middle" font-size="9" font-weight="700" fill="#1b2a3a"></text>
+      <line x1="0" y1="374" x2="320" y2="374" stroke="#c5d1cd" stroke-width="4"/></svg>`;
+  };
+  function lawDerive(c){ const s=c.s;
+    if(c.mode==='free'){ s.p=100+25*s.w; s.V=R*s.n*s.T/s.p; } else s.p=R*s.n*s.T/s.V; }
+  function lawRecord(k){ const c=LAWS[k], pt=c.pt(c.s);
+    if(k==='cb'){ pt.x=c.pts.length+1; c.pts.push(pt); return; }
+    const i=c.pts.findIndex(q=>Math.abs(q.x-pt.x)<1e-9); if(i>=0) c.pts[i]=pt; else c.pts.push(pt);
+    c.pts.sort((a,b)=>a.x-b.x); }
+  function lawReset(k){ const c=LAWS[k];
+    c.s={T:300,V:2,n:k==='av'?0.08:N0,w:0}; lawDerive(c); c.d={...c.s}; c.prev=null; c.pts=[]; c.trend=null;
+    c.state1=k==='cb'?{...c.s}:null; lawRecord(k); lawInfo(k,''); }
+  const ratio = (a,b) => `×${num(b/a,3)}`;
+  function lawExplain(k,c){ const s=c.s, p0=c.prev;
+    switch(k){
+      case 'gl': return p0&&p0.T!==s.T
+        ? `T: ${num(p0.T,0)} K → ${num(s.T,0)} K (${ratio(p0.T,s.T)}). p: ${num(p0.p,1)} → ${num(s.p,1)} kPa (${ratio(p0.p,s.p)}). ${s.T>p0.T?'Las partículas se mueven más rápido y chocan con más fuerza y más seguido contra las paredes':'Las partículas se mueven más lento y chocan con menos fuerza y menos seguido'}: la presión cambia en la misma proporción que la temperatura absoluta. En °C no se cumple (${degC(p0.T)} → ${degC(s.T)}).`
+        : 'Cambia la temperatura y compara cuánto varía la presión. Observa que p/T no cambia.';
+      case 'ch': return p0&&p0.T!==s.T
+        ? `T: ${num(p0.T,0)} K → ${num(s.T,0)} K (${ratio(p0.T,s.T)}). V: ${num(p0.V,2)} → ${num(s.V,2)} L (${ratio(p0.V,s.V)}). ${s.T>p0.T?'Las partículas golpean el pistón con más fuerza y lo empujan hacia arriba':'Las partículas golpean el pistón con menos fuerza y el pistón baja'} hasta que la presión vuelve a ser 100 kPa: el volumen es proporcional a la temperatura absoluta.`
+        : 'Calienta o enfría el gas y compara cuánto cambia el volumen. Observa que V/T no cambia.';
+      case 'by': return p0&&p0.V!==s.V
+        ? `V: ${num(p0.V,2)} → ${num(s.V,2)} L (${ratio(p0.V,s.V)}). p: ${num(p0.p,1)} → ${num(s.p,1)} kPa (${ratio(p0.p,s.p)}). ${s.V<p0.V?'Con menos espacio, las partículas chocan más seguido contra las paredes y la presión sube':'Con más espacio, las partículas chocan menos seguido y la presión baja'}: p y V son inversamente proporcionales y p·V se mantiene en ${num(s.p*s.V,0)} J.`
+        : 'Empuja o tira del émbolo. Si el volumen se reduce a la mitad, ¿qué le pasa a la presión?';
+      case 'av': return p0&&p0.n!==s.n
+        ? `n: ${num(p0.n,3)} → ${num(s.n,3)} mol (${ratio(p0.n,s.n)}). V: ${num(p0.V,2)} → ${num(s.V,2)} L (${ratio(p0.V,s.V)}). ${s.n>p0.n?'Más partículas a la misma presión y temperatura necesitan más espacio':'Con menos partículas, el gas ocupa menos espacio'}: el volumen es proporcional a la cantidad de gas.`
+        : 'Inyecta o libera gas y compara cuánto cambia el volumen. Observa que V/n no cambia.';
+      case 'cb': { const a=c.state1, k1=a.p*a.V/a.T, k2=s.p*s.V/s.T;
+        let which='';
+        if(Math.abs(a.T-s.T)<1e-9 && Math.abs(a.p-s.p)>1e-9) which=' Como T no cambió, es un caso de la ley de Boyle.';
+        else if(Math.abs(a.p-s.p)<1e-9 && Math.abs(a.T-s.T)>1e-9) which=' Como p no cambió, es un caso de la ley de Charles.';
+        return `Estado 1: p₁V₁/T₁ = ${num(a.p,0)} × ${num(a.V,2)} / ${num(a.T,0)} = ${num(k1,4)} J/K. Estado actual: p₂V₂/T₂ = ${num(s.p,0)} × ${num(s.V,2)} / ${num(s.T,0)} = ${num(k2,4)} J/K. Son iguales porque la cantidad de gas no cambió.${which}`; }
+    }
+  }
+  const TREND_MIN = 5;
+  // Línea de tendencia ajustada a las mediciones (mínimos cuadrados), muestreada en 60 puntos para poder animarla.
+  function lawTrend(k,c){ const P=c.pts, n=P.length, sample=(a,b,f)=>Array.from({length:60},(_,i)=>{const x=a+(b-a)*i/59;return {x,y:f(x)};});
+    const sxy=P.reduce((t,q)=>t+q.x*q.y,0), sxx=P.reduce((t,q)=>t+q.x*q.x,0);
+    switch(k){
+      case 'gl': { const m=sxy/sxx; return {label:`Tendencia: p = ${num(m,4)}·T`, data:sample(0,650,x=>m*x)}; }
+      case 'ch': { const m=sxy/sxx; return {label:`Tendencia: V = ${num(m,5)}·T`, data:sample(0,650,x=>m*x)}; }
+      case 'av': { const m=sxy/sxx; return {label:`Tendencia: V = ${num(m,2)}·n`, data:sample(0,0.18,x=>m*x)}; }
+      case 'by': { const kk=P.reduce((t,q)=>t+q.y/q.x,0)/P.reduce((t,q)=>t+1/(q.x*q.x),0);
+        return {label:`Tendencia: p = ${num(kk,1)} / V`, data:sample(0.45,4.5,x=>kk/x)}; }
+      case 'cb': { const mean=P.reduce((t,q)=>t+q.y,0)/n;
+        return {label:`Tendencia: pV/T = ${num(mean,4)} J/K`, data:sample(0.5,n+0.5,()=>mean)}; }
+    }
+  }
+  const easeOut = t => 1-Math.pow(1-t,3);
+  const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function lawChart(k,c){
+    const ch=charts[k], ds=ch.data.datasets, n=c.pts.length;
+    ds[0].data=c.pts;
+    if(k==='cb') ch.options.scales.x.max=Math.max(10,n+1);
+    const hint=$(k+'-trend-hint');
+    if(n<TREND_MIN){
+      if(c.trend&&c.trend.raf) cancelAnimationFrame(c.trend.raf);
+      c.trend=null; ds[1].data=[]; ds[1].label='Tendencia';
+      hint.textContent=`Registra ${TREND_MIN} configuraciones distintas para ver la línea de tendencia (${n}/${TREND_MIN}).`;
+      return ch.update('none');
+    }
+    const tr=lawTrend(k,c); ds[1].label=tr.label;
+    hint.textContent=`Línea de tendencia ajustada a ${n} mediciones.`;
+    if(c.trend){ c.trend.full=tr.data; if(!c.trend.raf) ds[1].data=tr.data; return ch.update('none'); }
+    // Primera vez que se alcanzan 5 puntos: la línea se dibuja progresivamente.
+    c.trend={full:tr.data,raf:0};
+    if(reduceMotion()){ ds[1].data=tr.data; return ch.update('none'); }
+    const t0=performance.now(), dur=1100;
+    const step=now=>{ if(!c.trend) return;
+      const f=easeOut(Math.min(1,(now-t0)/dur)), full=c.trend.full, cut=f*(full.length-1), i=Math.floor(cut);
+      const part=full.slice(0,i+1);
+      if(i<full.length-1){ const a=full[i], b=full[i+1], r=cut-i; part.push({x:a.x+(b.x-a.x)*r,y:a.y+(b.y-a.y)*r}); }
+      ds[1].data=part; ch.update('none');
+      if(f<1) c.trend.raf=requestAnimationFrame(step); else { c.trend.raf=0; ds[1].data=c.trend.full; ch.update('none'); }
+    };
+    c.trend.raf=requestAnimationFrame(step);
+  }
+  function lawInfo(k,msg){ const c=LAWS[k], s=c.s, set=(id,t)=>{ if($(id)) $(id).textContent=t; };
+    const m={
+      gl:[num(s.p,1)+' kPa',fmtT(s.T),'2,00 L',num(s.p/s.T,4)+' kPa/K'],
+      ch:[num(s.V,2)+' L',fmtT(s.T),'100 kPa',num(s.V/s.T*1000,3)+' mL/K'],
+      by:[num(s.p,1)+' kPa',num(s.V,2)+' L','300 K (27 °C)',num(s.p*s.V,1)+' J'],
+      av:[num(s.V,2)+' L',num(s.n,3)+' mol','100 kPa y 300 K',num(s.V/s.n,2)+' L/mol'],
+      cb:[num(s.p,0)+' kPa',num(s.V,2)+' L',fmtT(s.T),num(s.p*s.V/s.T,4)+' J/K']}[k];
+    m.forEach((t,i)=>set(`${k}-m${i}`,t));
+    set(k+'-t-out',fmtT(s.T)); set(k+'-v-out',num(s.V,2)+' L'); set(k+'-n-out',num(s.n,3)+' mol');
+    set(k+'-w-out',`${s.w} pesa${s.w===1?'':'s'}, ${num(s.p,0)} kPa`); set(k+'-s1-out',c.state1?'Estado 1 guardado':'');
+    if(k==='cb'){ const a=c.state1, row=(name,q)=>`<tr><td class="py-1 font-semibold">${name}</td><td>${num(q.p,0)}</td><td>${num(q.V,2)}</td><td>${num(q.T,0)}</td><td class="font-bold">${num(q.p*q.V/q.T,4)}</td></tr>`;
+      $('cb-states').innerHTML=`<table class="w-full text-sm readout"><thead><tr class="text-left text-[#566779]"><th class="py-1 font-semibold">Estado</th><th class="font-semibold">p (kPa)</th><th class="font-semibold">V (L)</th><th class="font-semibold">T (K)</th><th class="font-semibold">pV/T (J/K)</th></tr></thead><tbody>${row('1 (guardado)',a)}${row('2 (actual)',s)}</tbody></table>`; }
+    if(c.scene.weights) for(let i=0;i<6;i++) show(`${k}-w${i}`,i<s.w);
+    set(k+'-explain',lawExplain(k,c));
+    if(msg!==undefined) set(k+'-msg',msg);
+    lawChart(k,c);
+  }
+  function lawAct(k,act){ const c=LAWS[k], s=c.s;
+    if(act==='reset') return lawReset(k);
+    if(act==='save'){ c.state1={...s}; return lawInfo(k,'Estado 1 guardado. Ahora cambia la presión y la temperatura.'); }
+    const before={...s}; let msg='';
+    switch(act){
+      case 'heat': if(s.T>=600){ msg='Válvula de seguridad: el gas no se calienta sobre 600 K.'; break; } s.T=Math.min(600,s.T+25); break;
+      case 'room': s.T=300; break;
+      case 'ice': s.T=273; break;
+      case 'dry': s.T=195; break;
+      case 'push': if(s.V<=0.5+1e-9){ msg='El émbolo llegó al tope.'; break; } s.V=+(s.V-0.25).toFixed(2); break;
+      case 'pull': if(s.V>=4-1e-9){ msg='El émbolo llegó al final de la jeringa.'; break; } s.V=+(s.V+0.25).toFixed(2); break;
+      case 'inject': if(s.n>=0.16-1e-9){ msg='El cilindro está casi lleno: no cabe más gas.'; break; } s.n=+(s.n+0.01).toFixed(2); break;
+      case 'release': if(s.n<=0.02+1e-9){ msg='Deja algo de gas en el cilindro.'; break; } s.n=+(s.n-0.01).toFixed(2); break;
+      case 'wadd': if(s.w>=6){ msg='No caben más pesas.'; break; } s.w++; break;
+      case 'wrem': if(s.w<=0){ msg='No quedan pesas sobre el pistón.'; break; } s.w--; break;
+    }
+    lawDerive(c);
+    if(['T','V','n','w'].some(q=>before[q]!==s[q])){ c.prev=before; lawRecord(k); }
+    lawInfo(k,msg);
+  }
+  function lawDraw(k,jitter){ const c=LAWS[k], d=c.d, s=c.s, o=c.scene;
+    const yb=320-d.V/VMAXL*270;
+    if(!o.rigid){ setA(k+'-gas',{y:yb,height:320-yb}); $(k+'-top').setAttribute('transform',`translate(0,${yb})`); }
+    $(k+'-gas').setAttribute('fill',gasColor(d.T));
+    $(k+'-needle').setAttribute('transform',`rotate(${-120+clamp(d.p/c.pmax,0,1)*240} 262 96)`);
+    $(k+'-gauge-t').textContent=num(d.p,0)+' kPa';
+    $(k+'-temp-t').textContent=fmtT(d.T);
+    if(o.burner){ show(k+'-burner-flame',s.T>300); const f=(s.T-300)/300; $(k+'-flame').setAttribute('transform',`scale(${0.7+f*.5},${0.32+f*.3})`); }
+    if(o.bath){ show(k+'-bath',s.T<=273); show(k+'-fog',s.T<=200); $(k+'-bath-r').setAttribute('fill',s.T<=200?'#dfe9f3':'#c4e6ef'); }
+    const n=k==='av'?clamp(Math.round(s.n/0.01),1,20):10, top=o.rigid?320-2/VMAXL*270:yb, amp=.05*Math.sqrt(d.T/300);
+    c.parts.forEach((pt,i)=>{ pt.e.style.display=i<n?'':'none'; if(i>=n) return;
+      if(jitter){ pt.x=clamp(pt.x+(Math.random()-.5)*2*amp,.06,.94); pt.y=clamp(pt.y+(Math.random()-.5)*2*amp,.06,.94); }
+      pt.e.setAttribute('cx',72+pt.x*136); pt.e.setAttribute('cy',top+pt.y*(320-top)); });
+  }
+  document.querySelector('main > footer').insertAdjacentHTML('beforebegin',Object.entries(LAWS).map(([k,c])=>lawSectionHTML(k,c)).join(''));
+  Object.entries(LAWS).forEach(([k,c])=>{
+    $(k+'-scene').innerHTML=lawScene(k,c.scene);
+    const sets=[{label:'Mediciones',data:[],borderColor:'#1b2a3a',backgroundColor:'#1b2a3a',pointRadius:5,showLine:k==='cb',borderWidth:2,tension:0},
+                {label:'Tendencia',data:[],borderColor:'#cf3e2e',backgroundColor:'#cf3e2e',pointRadius:0,borderWidth:3,borderDash:[7,5],tension:0}];
+    charts[k]=baseChart(k+'-chart',c.x.title,c.y.title,sets);
+    Object.assign(charts[k].options.scales.x,{min:c.x.min,max:c.x.max}); Object.assign(charts[k].options.scales.y,{min:c.y.min,max:c.y.max});
+    // La leyenda de la tendencia solo aparece cuando la línea existe.
+    charts[k].options.plugins.legend.labels.filter=(item,data)=>data.datasets[item.datasetIndex].data.length>0;
+    const g=$(k+'-parts');
+    c.parts=[...Array(20)].map(()=>{ const e=document.createElementNS(NS,'circle'); e.setAttribute('r',3.2); e.setAttribute('fill','#7a3b22'); e.setAttribute('opacity','.55'); g.appendChild(e); return {e,x:Math.random(),y:Math.random()}; });
+    lawReset(k); lawDraw(k,false);
+  });
+  document.addEventListener('click',e=>{ const b=e.target.closest('[data-law]'); if(b) lawAct(b.dataset.law,b.dataset.act); });
+  let lawFrame=0;
+  (function lawLoop(){
+    lawFrame++;
+    const st=document.querySelector('.station.active'), k=st&&st.id;
+    if(LAWS[k]){ const c=LAWS[k]; ['T','V','p','n'].forEach(q=>c.d[q]+=(c.s[q]-c.d[q])*.12); lawDraw(k,lawFrame%3===0); }
+    requestAnimationFrame(lawLoop);
+  })();
+
+  /* ---------- portada y navegación entre actividades ---------- */
+  const STATIONS=[...document.querySelectorAll('.station')].map(st=>st.id);
+  let lastStation='';
+  let userNavigated=false;
+  function route(){
+    const id=location.hash.replace(/^#\/?/,''), open=STATIONS.includes(id);
+    $('home').hidden=open; $('activity-bar').hidden=!open;
+    document.querySelectorAll('.station').forEach(st=>st.classList.toggle('active',st.id===id));
+    if(open){
+      lastStation=id; const ch=charts[id]; if(ch) ch.resize();
+      document.title=`${$(id+'-title').textContent} – Laboratorio de Termodinámica`;
+      window.scrollTo(0,0); if(userNavigated) $('back-btn').focus({preventScroll:true});
+    } else {
+      document.title='Laboratorio de Termodinámica';
+      const card=lastStation&&document.querySelector(`[data-open="${lastStation}"]`);
+      if(card&&userNavigated){ card.scrollIntoView({block:'center'}); card.focus({preventScroll:true}); }
+    }
+  }
+  let openedFromHome=false;
+  document.querySelectorAll('[data-open]').forEach(card=>card.addEventListener('click',()=>{ openedFromHome=true; location.hash='/'+card.dataset.open; }));
+  $('back-btn').addEventListener('click',()=>{
+    if(openedFromHome){ openedFromHome=false; history.back(); return; }   // vuelve en el historial: el botón "atrás" del navegador queda coherente
+    userNavigated=true;
+    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){ location.hash=''; }
+    route();
+  });
+  window.addEventListener('hashchange',()=>{ userNavigated=true; route(); });
+
+  if(window.lucide) lucide.createIcons();
+  heating(); mixing(); gasRender(); carnot(''); route();
+})();
+  </script>
+ </body>
+</html>
